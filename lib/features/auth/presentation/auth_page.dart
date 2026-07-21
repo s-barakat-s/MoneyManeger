@@ -21,6 +21,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   bool _isSubmitting = false;
   bool _obscurePassword = true;
+  bool _showSuccess = false;
   String? _message;
 
   @override
@@ -35,7 +36,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     return _AuthScaffold(
       cardTitle: 'Welcome back',
       cardSubtitle: 'Sign in to continue managing your business.',
-      child: Form(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _showSuccess
+            ? const _AuthSuccessState(
+                key: ValueKey('login-success'),
+                title: 'Welcome back!',
+                subtitle: 'Login successful',
+              )
+            : Form(
         key: _formKey,
         child: AutofillGroup(
           child: Column(
@@ -102,6 +113,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             ],
           ),
         ),
+            ),
       ),
     );
   }
@@ -115,17 +127,32 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _isSubmitting = true;
       _message = null;
     });
+    ref
+        .read(authSuccessPresentationProvider.notifier)
+        .begin(AuthSuccessKind.login);
 
     try {
       await ref.read(authServiceProvider).signInWithEmailPassword(
             email: _emailController.text,
             password: _passwordController.text,
           );
+      if (!mounted) {
+        ref.read(authSuccessPresentationProvider.notifier).complete();
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _showSuccess = true;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 950));
+      ref.read(authSuccessPresentationProvider.notifier).complete();
     } on FirebaseAuthException catch (error) {
+      ref.read(authSuccessPresentationProvider.notifier).complete();
       if (mounted) {
         setState(() => _message = _friendlyAuthError(error));
       }
     } catch (error) {
+      ref.read(authSuccessPresentationProvider.notifier).complete();
       if (mounted) {
         setState(() => _message = 'Authentication failed. Please try again.');
       }
@@ -182,6 +209,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _isSubmitting = false;
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
+  bool _showSuccess = false;
   String? _message;
 
   @override
@@ -199,7 +227,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       showBackButton: true,
       cardTitle: 'Create your account',
       cardSubtitle: 'Start building a clearer financial picture today.',
-      child: Form(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _showSuccess
+            ? const _AuthSuccessState(
+                key: ValueKey('registration-success'),
+                title: 'Account created!',
+                subtitle: 'Your account is ready',
+              )
+            : Form(
         key: _formKey,
         child: AutofillGroup(
           child: Column(
@@ -300,6 +338,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ],
           ),
         ),
+            ),
       ),
     );
   }
@@ -313,6 +352,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _isSubmitting = true;
       _message = null;
     });
+    ref
+        .read(authSuccessPresentationProvider.notifier)
+        .begin(AuthSuccessKind.registration);
 
     try {
       await ref.read(authServiceProvider).registerWithEmailPassword(
@@ -320,11 +362,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             email: _emailController.text,
             password: _passwordController.text,
           );
+      if (!mounted) {
+        ref.read(authSuccessPresentationProvider.notifier).complete();
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+        _showSuccess = true;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 950));
+      ref.read(authSuccessPresentationProvider.notifier).complete();
     } on FirebaseAuthException catch (error) {
+      ref.read(authSuccessPresentationProvider.notifier).complete();
       if (mounted) {
         setState(() => _message = _friendlyAuthError(error));
       }
     } catch (error) {
+      ref.read(authSuccessPresentationProvider.notifier).complete();
       if (mounted) {
         setState(() => _message = 'Could not create account. Please try again.');
       }
@@ -806,6 +860,113 @@ class _AuthSwitchAction extends StatelessWidget {
           child: Text('$action  →'),
         ),
       ],
+    );
+  }
+}
+
+class _AuthSuccessState extends StatefulWidget {
+  const _AuthSuccessState({
+    required this.title,
+    required this.subtitle,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  State<_AuthSuccessState> createState() => _AuthSuccessStateState();
+}
+
+class _AuthSuccessStateState extends State<_AuthSuccessState>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    );
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.55, curve: Curves.easeOut),
+    );
+    _scale = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return FadeTransition(
+      opacity: _fade,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ScaleTransition(
+              scale: _scale,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.success, Color(0xFF119A5B)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.success.withValues(alpha: 0.3),
+                      blurRadius: 26,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: const SizedBox.square(
+                  dimension: 82,
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 46,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              widget.subtitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

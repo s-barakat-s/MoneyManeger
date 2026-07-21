@@ -14,11 +14,14 @@ class MoneyManagerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final authState = ref.watch(authStateProvider);
+    final authSuccessPresentation = ref.watch(authSuccessPresentationProvider);
     final themeMode = ref.watch(themeModeProvider);
 
     return authState.when(
       data: (user) {
-        if (user == null || user.isAnonymous) {
+        if (user == null ||
+            user.isAnonymous ||
+            authSuccessPresentation != null) {
           return MaterialApp(
             title: 'Money Manager',
             theme: AppTheme.light,
