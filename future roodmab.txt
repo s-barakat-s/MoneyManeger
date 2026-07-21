@@ -1,0 +1,404 @@
+# Money Manager SaaS - Future Roadmap (Post V1)
+
+The core financial engine should be completed first.
+
+The goal is to finish the business logic before investing time in UI/UX improvements.
+
+---
+
+# Phase 1 (Core)
+
+✅ Owners
+
+✅ Transactions
+
+✅ Transfers
+
+✅ Debts
+
+✅ Receivables
+
+✅ Company Assets
+
+✅ Dynamic Balance Calculation
+
+✅ Dashboard
+
+---
+
+# Phase 2 (Reports & Productivity)
+
+## Financial Reports
+
+Create a dedicated Reports section.
+
+Reports should support:
+
+* Income Report
+* Expense Report
+* Cash Flow
+* Receivables Report
+* Debts Report
+* Assets Report
+* Profit Summary
+
+Filtering:
+
+* Today
+* This Week
+* This Month
+* This Year
+* Custom Date Range
+
+Export:
+
+* PDF
+* Excel
+
+---
+
+## Search
+
+Global search across the entire application.
+
+Examples:
+
+Searching for:
+
+Ahmed
+
+Should return:
+
+* Owner
+* Transactions
+* Transfers
+* Debts
+* Receivables
+* Assets
+
+---
+
+## Advanced Filters
+
+Every page should support filtering.
+
+Transactions:
+
+* Owner
+* Income
+* Expense
+* Date
+* Amount
+
+Debts:
+
+* Open
+* Paid
+* Partial
+
+Receivables:
+
+* Open
+* Collected
+* Partial
+
+Assets:
+
+* Category
+* Purchase Date
+
+---
+
+# Phase 3 (Organization)
+
+## Categories
+
+Transactions should support categories.
+
+Expense Categories:
+
+* Rent
+* Salaries
+* Shipping
+* Packaging
+* Ads
+* Fabric
+* Utilities
+* Taxes
+* Other
+
+Income Categories:
+
+* Sales
+* Investment
+* Refund
+* Other
+
+These categories will improve reporting significantly.
+
+---
+
+## Attachments
+
+Allow attaching:
+
+* Images
+* PDFs
+* Receipts
+* Invoices
+
+To:
+
+* Transactions
+* Debts
+* Receivables
+* Assets
+
+---
+
+## Due Dates
+
+Support due dates for:
+
+* Debts
+* Receivables
+
+Show overdue items automatically.
+
+---
+
+## Partial Payment History
+
+Instead of only showing total paid,
+
+Display every payment separately with:
+
+* Amount
+* Date
+* Note
+
+---
+
+# Phase 4 (Safety & History)
+
+## Activity Log
+
+Track every important action.
+
+Examples:
+
+* Owner created
+* Transaction edited
+* Transfer deleted
+* Debt paid
+* Asset added
+
+Display:
+
+User
+
+Action
+
+Date
+
+Time
+
+---
+
+## Archive
+
+Instead of deleting important data,
+
+Allow:
+
+* Archive Owner
+* Archive Asset
+* Archive Debt
+* Archive Receivable
+
+---
+
+## Trash
+
+Recover accidentally deleted items.
+
+---
+
+## Undo Actions
+
+After deleting an item,
+
+Allow Undo for a few seconds.
+
+---
+
+# Phase 5 (Business Management)
+
+## Capital Management
+
+Separate capital movements from normal business operations.
+
+Support:
+
+Owner Contribution
+
+Owner Withdrawal
+
+Track:
+
+* Total company capital
+* Capital per owner
+* Contribution history
+* Withdrawal history
+
+These operations must NOT be treated as Income or Expense.
+
+---
+
+## Notifications
+
+Examples:
+
+* Debt overdue
+* Receivable overdue
+* Large expense
+* Large transfer
+* Low available cash
+
+---
+
+## Financial Health Engine
+
+Automatically analyze company status.
+
+Statuses:
+
+* Healthy
+* Warning
+* Critical
+
+Based on:
+
+* Cash
+* Debts
+* Receivables
+
+Provide simple financial insights.
+
+---
+
+# Phase 6 (Multi User SaaS)
+
+## Multiple Brands
+
+Allow managing multiple companies.
+
+Example:
+
+Brand A
+
+Brand B
+
+Brand C
+
+Each brand has completely isolated:
+
+* Owners
+* Cash
+* Assets
+* Debts
+* Receivables
+
+---
+
+## Team Members
+
+Roles:
+
+* Admin
+* Accountant
+* Manager
+* Viewer
+
+---
+
+## Permissions
+
+Control who can:
+
+* View
+* Create
+* Edit
+* Delete
+
+Each feature independently.
+
+---
+
+# Phase 7 (Settings)
+
+Settings page should include:
+
+* Currency
+* Language
+* Date Format
+* Theme
+* Company Information
+* Backup Options
+
+---
+
+# Phase 8 (Analytics)
+
+Interactive dashboards.
+
+Charts for:
+
+* Income vs Expense
+* Monthly Cash Flow
+* Debt Trend
+* Receivables Trend
+* Asset Distribution
+
+---
+
+# Phase 9 (Automation)
+
+Scheduled reports.
+
+Monthly email reports.
+
+Automatic reminders.
+
+Cloud backups.
+
+Data synchronization.
+
+---
+
+# UI / UX (Final Stage)
+
+Once every feature is complete,
+
+Start rebuilding the entire interface.
+
+Goals:
+
+* Premium SaaS appearance
+* Material 3
+* Smooth animations
+* Responsive design
+* Desktop-first experience
+* Mobile optimization
+* Better spacing
+* Modern typography
+* Better color system
+* Empty states
+* Skeleton loaders
+* Beautiful dashboard
+* Interactive charts
+* Better dialogs
+* Improved navigation
+* Consistent design language
+
+The UI redesign should be done only after the business logic is fully completed.

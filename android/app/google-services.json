@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "339362530098",
+    "project_id": "money-manager-2df2b",
+    "storage_bucket": "money-manager-2df2b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339362530098:android:363148fd3f9854efaf0d2b",
+        "android_client_info": {
+          "package_name": "com.barakat.moneymanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv0EluD5ITPvX6IYKr56oMDzD_idk3-Uo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339362530098:android:16c4c0aec58cc934af0d2b",
+        "android_client_info": {
+          "package_name": "com.example.money_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv0EluD5ITPvX6IYKr56oMDzD_idk3-Uo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
