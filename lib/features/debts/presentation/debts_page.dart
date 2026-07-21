@@ -328,7 +328,7 @@ class _DebtsList extends StatelessWidget {
     }
 
     return ListView.separated(
-      padding: AppBottomNavSpacer.listPadding,
+      padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleDebts.length,
       separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) => _DebtListItem(debt: visibleDebts[index]),

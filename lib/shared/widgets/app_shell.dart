@@ -10,6 +10,7 @@ import '../../core/services/app_update_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import 'bottom_nav_spacer.dart';
 import 'responsive_dialog_content.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -214,7 +215,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
-                  bottom: MediaQuery.paddingOf(context).bottom + AppSpacing.sm,
+                  bottom: MediaQuery.paddingOf(context).bottom +
+                      AppBottomNavSpacer.navigationBarBottomMargin,
                   child: _MobileBottomNav(
                     currentLocation: widget.currentLocation,
                   ),
@@ -550,7 +552,7 @@ class _MobileBottomNav extends StatelessWidget {
         ],
       ),
       child: SizedBox(
-        height: 76,
+        height: AppBottomNavSpacer.navigationBarHeight,
         child: Row(
           children: [
             _BottomNavItem(

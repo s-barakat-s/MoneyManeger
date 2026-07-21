@@ -14,6 +14,7 @@ import '../../../shared/models/transaction.dart' as money;
 import '../../../shared/widgets/amount_text.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_shell.dart';
+import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
@@ -88,7 +89,7 @@ class _DashboardHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       clipBehavior: Clip.none,
-      padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+      padding: AppBottomNavSpacer.listPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

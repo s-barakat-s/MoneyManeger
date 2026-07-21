@@ -82,7 +82,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             _profileValue(profile['email']) ?? widget.user.email ?? 'Not set';
 
         return ListView(
-          padding: AppBottomNavSpacer.listPadding,
+          padding: AppBottomNavSpacer.listPadding(context),
           children: [
             const PageHeader(
               title: 'Settings',

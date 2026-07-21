@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../shared/models/owner.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_shell.dart';
+import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
@@ -127,7 +128,7 @@ class _OwnersList extends ConsumerWidget {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 96),
+      padding: AppBottomNavSpacer.listPadding(context),
       itemCount: owners.length,
       separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
