@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/transaction.dart' as money;
 import '../../../../shared/widgets/form_dialog_widgets.dart';
@@ -27,6 +28,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   String? _ownerId;
+  money.TransactionType? _initializedOwnerType;
   late money.TransactionType _type;
   DateTime _date = DateTime.now();
   var _isSaving = false;
@@ -53,19 +55,28 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       scrollable: true,
       title: const Text('Add transaction'),
       content: ownersAsync.when(
-        data: (owners) => _TransactionForm(
-          formKey: _formKey,
-          owners: owners,
-          ownerId: _ownerId,
-          type: _type,
-          date: _date,
-          amountController: _amountController,
-          noteController: _noteController,
-          onOwnerChanged: (value) => setState(() => _ownerId = value),
-          onTypeChanged: (value) => setState(() => _type = value),
-          onDateChanged: (value) => setState(() => _date = value),
-          errorMessage: _errorMessage,
-        ),
+        data: (owners) {
+          _initializeOwner(owners);
+          return _TransactionForm(
+            formKey: _formKey,
+            owners: owners,
+            ownerId: _ownerId,
+            type: _type,
+            date: _date,
+            amountController: _amountController,
+            noteController: _noteController,
+            onOwnerChanged: (value) => setState(() => _ownerId = value),
+            onTypeChanged: (value) {
+              setState(() {
+                _type = value;
+                _ownerId = null;
+                _initializedOwnerType = null;
+              });
+            },
+            onDateChanged: (value) => setState(() => _date = value),
+            errorMessage: _errorMessage,
+          );
+        },
         loading: () => const SizedBox(
           height: 96,
           child: Center(child: CircularProgressIndicator()),
@@ -107,6 +118,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
             ),
           );
 
+      await ref.read(lastUsedSelectionProvider).save(
+            _selectionPreference,
+            _ownerId!,
+          );
+
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -135,6 +151,36 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         'Firestore did not confirm this save. Please try again.',
       _ => 'Could not save (${error.code}). Please try again.',
     };
+  }
+
+  LastUsedOwnerSelection get _selectionPreference =>
+      _type == money.TransactionType.income
+          ? LastUsedOwnerSelection.income
+          : LastUsedOwnerSelection.expense;
+
+  void _initializeOwner(List<Owner> owners) {
+    if (owners.isEmpty || _initializedOwnerType == _type) {
+      return;
+    }
+    final initializingType = _type;
+    _initializedOwnerType = initializingType;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final selection = initializingType == money.TransactionType.income
+          ? LastUsedOwnerSelection.income
+          : LastUsedOwnerSelection.expense;
+      final remembered =
+          await ref.read(lastUsedSelectionProvider).read(selection);
+      if (!mounted || _type != initializingType || _ownerId != null) {
+        return;
+      }
+
+      setState(() {
+        _ownerId = owners.any((owner) => owner.id == remembered)
+            ? remembered
+            : owners.first.id;
+      });
+    });
   }
 }
 
@@ -174,6 +220,7 @@ class _TransactionForm extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
+              key: ValueKey(ownerId),
               initialValue: ownerId,
               decoration: const InputDecoration(labelText: 'Money Holder'),
               items: [

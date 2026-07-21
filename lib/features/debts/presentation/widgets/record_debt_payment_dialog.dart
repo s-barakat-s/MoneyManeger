@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/debt.dart';
+import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/debt_payment.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
@@ -32,6 +34,7 @@ class _RecordDebtPaymentDialogState
   late final TextEditingController _amountController;
   final _noteController = TextEditingController();
   String? _ownerId;
+  bool _didInitializeOwner = false;
   DateTime _date = DateTime.now();
   var _isSaving = false;
   String? _errorMessage;
@@ -71,6 +74,8 @@ class _RecordDebtPaymentDialogState
             );
           }
 
+          _initializeOwner(owners);
+
           return ResponsiveDialogContent(
             child: Form(
               key: _formKey,
@@ -78,6 +83,7 @@ class _RecordDebtPaymentDialogState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
+                    key: ValueKey(_ownerId),
                     initialValue: _ownerId,
                     decoration: InputDecoration(labelText: _ownerFieldLabel),
                     items: [
@@ -192,6 +198,11 @@ class _RecordDebtPaymentDialogState
             ),
           );
 
+      await ref.read(lastUsedSelectionProvider).save(
+            _selectionPreference,
+            _ownerId!,
+          );
+
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -215,6 +226,30 @@ class _RecordDebtPaymentDialogState
   }
 
   bool get _isCollection => widget.debt.type == DebtType.owedToUs;
+
+  LastUsedOwnerSelection get _selectionPreference => _isCollection
+      ? LastUsedOwnerSelection.receivableCollection
+      : LastUsedOwnerSelection.debtPayment;
+
+  void _initializeOwner(List<Owner> owners) {
+    if (_didInitializeOwner) {
+      return;
+    }
+    _didInitializeOwner = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final remembered =
+          await ref.read(lastUsedSelectionProvider).read(_selectionPreference);
+      if (!mounted || _ownerId != null) {
+        return;
+      }
+
+      final validRemembered = owners.any((owner) => owner.id == remembered);
+      setState(() {
+        _ownerId = validRemembered ? remembered : owners.first.id;
+      });
+    });
+  }
 
   String get _dialogTitle {
     if (_isCollection) {

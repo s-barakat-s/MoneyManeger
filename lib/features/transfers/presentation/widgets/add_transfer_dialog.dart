@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/transfer.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
@@ -22,6 +23,7 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
   final _noteController = TextEditingController();
   String? _fromOwnerId;
   String? _toOwnerId;
+  bool _didInitializeOwners = false;
   DateTime _date = DateTime.now();
   var _isSaving = false;
   String? _errorMessage;
@@ -50,6 +52,8 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
               ),
             );
           }
+
+          _initializeOwners(owners);
 
           return _TransferForm(
             formKey: _formKey,
@@ -106,6 +110,18 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
             ),
           );
 
+      final selections = ref.read(lastUsedSelectionProvider);
+      await Future.wait([
+        selections.save(
+          LastUsedOwnerSelection.transferFrom,
+          _fromOwnerId!,
+        ),
+        selections.save(
+          LastUsedOwnerSelection.transferTo,
+          _toOwnerId!,
+        ),
+      ]);
+
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -134,6 +150,47 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
         'Firestore did not confirm this save. Please try again.',
       _ => 'Could not save (${error.code}). Please try again.',
     };
+  }
+
+  void _initializeOwners(List<Owner> owners) {
+    if (_didInitializeOwners) {
+      return;
+    }
+    _didInitializeOwners = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final selections = ref.read(lastUsedSelectionProvider);
+      final remembered = await Future.wait([
+        selections.read(LastUsedOwnerSelection.transferFrom),
+        selections.read(LastUsedOwnerSelection.transferTo),
+      ]);
+      if (!mounted) {
+        return;
+      }
+
+      final rememberedFrom = remembered[0];
+      final rememberedTo = remembered[1];
+      final currentFromIsValid =
+          owners.any((owner) => owner.id == _fromOwnerId);
+      final currentToIsValid = owners.any((owner) => owner.id == _toOwnerId);
+      final fromId = currentFromIsValid
+          ? _fromOwnerId!
+          : owners.any((owner) => owner.id == rememberedFrom)
+              ? rememberedFrom!
+              : owners.first.id;
+      final toId = currentToIsValid && _toOwnerId != fromId
+          ? _toOwnerId
+          : owners.any(
+        (owner) => owner.id == rememberedTo && owner.id != fromId,
+      )
+              ? rememberedTo
+              : owners.where((owner) => owner.id != fromId).first.id;
+
+      setState(() {
+        _fromOwnerId = fromId;
+        _toOwnerId = toId;
+      });
+    });
   }
 }
 
@@ -173,6 +230,7 @@ class _TransferForm extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
+              key: ValueKey(fromOwnerId),
               initialValue: fromOwnerId,
               decoration: const InputDecoration(labelText: 'From money holder'),
               items: _ownerItems(),
@@ -190,6 +248,7 @@ class _TransferForm extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              key: ValueKey(toOwnerId),
               initialValue: toOwnerId,
               decoration: const InputDecoration(labelText: 'To money holder'),
               items: _ownerItems(),
