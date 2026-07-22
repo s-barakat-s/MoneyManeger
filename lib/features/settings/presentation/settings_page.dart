@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +14,7 @@ import '../../../shared/widgets/app_shell.dart';
 import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../auth/data/auth_service.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({
@@ -58,6 +60,7 @@ class _SettingsContent extends ConsumerStatefulWidget {
 
 class _SettingsContentState extends ConsumerState<_SettingsContent> {
   bool _isSigningOut = false;
+  bool _isSettingPassword = false;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +83,13 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             'Not set';
         final email =
             _profileValue(profile['email']) ?? widget.user.email ?? 'Not set';
+        final currentUser = FirebaseAuth.instance.currentUser ?? widget.user;
+        final hasGoogle = currentUser.providerData.any(
+          (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
+        );
+        final hasPassword = currentUser.providerData.any(
+          (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
+        );
 
         return ListView(
           padding: AppBottomNavSpacer.listPadding(context),
@@ -93,6 +103,50 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
               name: name,
               email: email,
               onEdit: () => _showEditProfileDialog(context, name, email),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            const _SectionTitle('Sign-in methods'),
+            const SizedBox(height: AppSpacing.sm),
+            _SettingsCard(
+              child: Column(
+                children: [
+                  _SettingsTile(
+                    icon: Icons.g_mobiledata_rounded,
+                    iconColor: AppColors.info,
+                    title: 'Google',
+                    subtitle: hasGoogle ? 'Connected' : 'Not connected',
+                    trailing: Icon(
+                      hasGoogle
+                          ? Icons.check_circle_rounded
+                          : Icons.remove_circle_outline_rounded,
+                      color: hasGoogle ? AppColors.success : null,
+                    ),
+                  ),
+                  const Divider(height: AppSpacing.xl),
+                  _SettingsTile(
+                    icon: Icons.password_rounded,
+                    iconColor: AppColors.primary,
+                    title: 'Email & Password',
+                    subtitle: hasPassword ? 'Connected' : 'Not configured',
+                    trailing: _isSettingPassword
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : hasGoogle && !hasPassword
+                            ? const Text('Set password')
+                            : Icon(
+                                hasPassword
+                                    ? Icons.check_circle_rounded
+                                    : Icons.remove_circle_outline_rounded,
+                                color: hasPassword ? AppColors.success : null,
+                              ),
+                    onTap: hasGoogle && !hasPassword && !_isSettingPassword
+                        ? _setPassword
+                        : null,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: AppSpacing.xl),
             const _SectionTitle('Appearance'),
@@ -207,6 +261,65 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     }
   }
 
+  Future<void> _setPassword() async {
+    if (_isSettingPassword) return;
+    final authService = ref.read(authServiceProvider);
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email?.trim();
+    if (user == null) {
+      _showMessage('No user is signed in.');
+      return;
+    }
+    if (email == null || email.isEmpty) {
+      _showMessage('Your Google account does not provide an email address.');
+      return;
+    }
+    if (user.providerData.any(
+      (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
+    )) {
+      _showMessage('Email & Password is already connected.');
+      return;
+    }
+
+    setState(() => _isSettingPassword = true);
+    try {
+      await authService.reauthenticateCurrentUserWithGoogle();
+      if (!mounted) return;
+      final created = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _SetPasswordDialog(
+          email: email,
+          authService: authService,
+        ),
+      );
+      if (!mounted) return;
+      if (created == true) {
+        setState(() {});
+        _showMessage('Password created successfully.');
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) _showMessage(_passwordLinkError(error));
+    } on GoogleSignInUnavailableException {
+      if (mounted) {
+        _showMessage('Google re-authentication is not available on Windows.');
+      }
+    } on MissingGoogleEmailException {
+      if (mounted) {
+        _showMessage('Your Google account does not provide an email address.');
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Set-password flow failed: ${error.runtimeType}.');
+      }
+      if (mounted) {
+        _showMessage('Could not verify your Google account. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSettingPassword = false);
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -228,6 +341,189 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       _ => 'Authentication failed (${error.code}). Please try again.',
     };
   }
+}
+
+class _SetPasswordDialog extends StatefulWidget {
+  const _SetPasswordDialog({
+    required this.email,
+    required this.authService,
+  });
+
+  final String email;
+  final AuthService authService;
+
+  @override
+  State<_SetPasswordDialog> createState() => _SetPasswordDialogState();
+}
+
+class _SetPasswordDialogState extends State<_SetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmation = true;
+  bool _isSubmitting = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Set app password'),
+      content: Form(
+        key: _formKey,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                initialValue: widget.email,
+                enabled: false,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: 'New password',
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                validator: _validateNewPassword,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _confirmationController,
+                obscureText: _obscureConfirmation,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'Confirm new password',
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(
+                      () => _obscureConfirmation = !_obscureConfirmation,
+                    ),
+                    icon: Icon(
+                      _obscureConfirmation
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                validator: (value) {
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match.';
+                  }
+                  return _validateNewPassword(value);
+                },
+                onFieldSubmitted: (_) {
+                  if (!_isSubmitting) _submit();
+                },
+              ),
+              if (_message != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  _message!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Set password'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate() || _isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _message = null;
+    });
+    try {
+      await widget.authService.linkPasswordToCurrentUser(
+        password: _passwordController.text,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on FirebaseAuthException catch (error) {
+      if (mounted) setState(() => _message = _passwordLinkError(error));
+    } on PasswordProviderAlreadyLinkedException {
+      if (mounted) {
+        setState(() => _message = 'Email & Password is already connected.');
+      }
+    } on MissingGoogleEmailException {
+      if (mounted) {
+        setState(() => _message = 'Your Google account has no email address.');
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Password linking failed: ${error.runtimeType}.');
+      }
+      if (mounted) {
+        setState(() => _message = 'Could not create password. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  String? _validateNewPassword(String? value) {
+    if ((value ?? '').isEmpty) return 'Password is required.';
+    if (value!.length < 8) return 'Password must be at least 8 characters.';
+    return null;
+  }
+}
+
+String _passwordLinkError(FirebaseAuthException error) {
+  return switch (error.code) {
+    'provider-already-linked' => 'Email & Password is already connected.',
+    'credential-already-in-use' || 'email-already-in-use' =>
+      'This email is already linked to another Firebase account.',
+    'requires-recent-login' =>
+      'Please verify your Google account again and retry.',
+    'weak-password' => 'Use a stronger password with at least 8 characters.',
+    'invalid-email' => 'The Google account email is invalid.',
+    'operation-not-allowed' =>
+      'Email and password sign-in is not enabled.',
+    'network-request-failed' =>
+      'Network error. Check your connection and try again.',
+    'user-mismatch' => 'Google verification used a different account.',
+    'user-disabled' => 'This account has been disabled.',
+    'popup-closed-by-user' || 'cancelled-popup-request' || 'canceled' =>
+      'Google re-authentication was cancelled.',
+    _ => 'Authentication failed. Please try again.',
+  };
 }
 
 class _AccountCard extends StatelessWidget {

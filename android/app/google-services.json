@@ -1,45 +1,59 @@
 {
   "project_info": {
-    "project_number": "339362530098",
-    "project_id": "money-manager-2df2b",
-    "storage_bucket": "money-manager-2df2b.firebasestorage.app"
+    "project_number": "651605242767",
+    "project_id": "moneymaneger-v2",
+    "storage_bucket": "moneymaneger-v2.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:339362530098:android:363148fd3f9854efaf0d2b",
+        "mobilesdk_app_id": "1:651605242767:android:0b07b5d8e2f7ca694951fa",
         "android_client_info": {
           "package_name": "com.barakat.moneymanager"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "651605242767-bllmj6p2locmt6ok75r4l0hvo9nll931.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.barakat.moneymanager",
+            "certificate_hash": "f075491a484780f74144aadee61aa6400d00f0c9"
+          }
+        },
+        {
+          "client_id": "651605242767-k86in99afi91q4ehtdq4mqegda2254o6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.barakat.moneymanager",
+            "certificate_hash": "b7d8f156df10eb563857f0c537fdd82d6c590f99"
+          }
+        },
+        {
+          "client_id": "651605242767-hhmfjddpe344snlqr0158rn2r21mnik5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAv0EluD5ITPvX6IYKr56oMDzD_idk3-Uo"
+          "current_key": "AIzaSyCv98YqPUwDnOyJhriXrZJW9W3faH77CKE"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:339362530098:android:16c4c0aec58cc934af0d2b",
-        "android_client_info": {
-          "package_name": "com.example.money_manager"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAv0EluD5ITPvX6IYKr56oMDzD_idk3-Uo"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "651605242767-hhmfjddpe344snlqr0158rn2r21mnik5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "651605242767-9tnet75pi8o25t46ff7jboa39in3j64k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.moneyManager"
+              }
+            }
+          ]
         }
       }
     }

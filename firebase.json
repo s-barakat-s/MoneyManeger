@@ -1,1 +1,35 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"money-manager-2df2b","appId":"1:339362530098:android:16c4c0aec58cc934af0d2b","fileOutput":"android/app/google-services.json"},"buildConfigurations":{".":{"projectId":"money-manager-2df2b","appId":"1:339362530098:android:363148fd3f9854efaf0d2b","fileOutput":"android/app/google-services.json"}}},"dart":{"lib/firebase_options.dart":{"projectId":"money-manager-2df2b","configurations":{"android":"1:339362530098:android:363148fd3f9854efaf0d2b"}}}}}}
+{
+  "functions": {
+    "source": "functions"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "moneymaneger-v2",
+          "appId": "1:651605242767:android:0b07b5d8e2f7ca694951fa",
+          "fileOutput": "android/app/google-services.json"
+        },
+        "buildConfigurations": {
+          ".": {
+            "projectId": "money-manager-2df2b",
+            "appId": "1:339362530098:android:363148fd3f9854efaf0d2b",
+            "fileOutput": "android/app/google-services.json"
+          }
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "moneymaneger-v2",
+          "configurations": {
+            "android": "1:651605242767:android:0b07b5d8e2f7ca694951fa",
+            "ios": "1:651605242767:ios:d9fd21dcdd7fb3984951fa",
+            "macos": "1:651605242767:ios:d9fd21dcdd7fb3984951fa",
+            "web": "1:651605242767:web:305c2475bc95a8d04951fa",
+            "windows": "1:651605242767:web:fca02dad9cf783974951fa"
+          }
+        }
+      }
+    }
+  }
+}

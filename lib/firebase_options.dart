@@ -41,46 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAmHz1Ys-fzYjlvvLgUDBVTpqQVA8tS-d4',
-    appId: '1:339362530098:web:382a1f8889f4602baf0d2b',
-    messagingSenderId: '339362530098',
-    projectId: 'money-manager-2df2b',
-    authDomain: 'money-manager-2df2b.firebaseapp.com',
-    storageBucket: 'money-manager-2df2b.firebasestorage.app',
-    measurementId: 'G-9SX1YNSE3W',
+    apiKey: 'AIzaSyD9RlGnIvTjm2wdOSb3gixCiM4JMdlpkiw',
+    appId: '1:651605242767:web:305c2475bc95a8d04951fa',
+    messagingSenderId: '651605242767',
+    projectId: 'moneymaneger-v2',
+    authDomain: 'moneymaneger-v2.firebaseapp.com',
+    storageBucket: 'moneymaneger-v2.firebasestorage.app',
+    measurementId: 'G-CZDR8DG15H',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAv0EluD5ITPvX6IYKr56oMDzD_idk3-Uo',
-    appId: '1:339362530098:android:363148fd3f9854efaf0d2b',
-    messagingSenderId: '339362530098',
-    projectId: 'money-manager-2df2b',
-    storageBucket: 'money-manager-2df2b.firebasestorage.app',
+    apiKey: 'AIzaSyCv98YqPUwDnOyJhriXrZJW9W3faH77CKE',
+    appId: '1:651605242767:android:0b07b5d8e2f7ca694951fa',
+    messagingSenderId: '651605242767',
+    projectId: 'moneymaneger-v2',
+    storageBucket: 'moneymaneger-v2.firebasestorage.app',
   );
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDO6vFLQ_QRJ5VjgQ0bHr9LYZpZUl9TIW4',
-    appId: '1:339362530098:ios:31ea243b0adf98afaf0d2b',
-    messagingSenderId: '339362530098',
-    projectId: 'money-manager-2df2b',
-    storageBucket: 'money-manager-2df2b.firebasestorage.app',
+    apiKey: 'AIzaSyA0dMFwgx1gffxibFV7wGYLft9yYhpOnWc',
+    appId: '1:651605242767:ios:d9fd21dcdd7fb3984951fa',
+    messagingSenderId: '651605242767',
+    projectId: 'moneymaneger-v2',
+    storageBucket: 'moneymaneger-v2.firebasestorage.app',
     iosBundleId: 'com.example.moneyManager',
   );
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDO6vFLQ_QRJ5VjgQ0bHr9LYZpZUl9TIW4',
-    appId: '1:339362530098:ios:31ea243b0adf98afaf0d2b',
-    messagingSenderId: '339362530098',
-    projectId: 'money-manager-2df2b',
-    storageBucket: 'money-manager-2df2b.firebasestorage.app',
+    apiKey: 'AIzaSyA0dMFwgx1gffxibFV7wGYLft9yYhpOnWc',
+    appId: '1:651605242767:ios:d9fd21dcdd7fb3984951fa',
+    messagingSenderId: '651605242767',
+    projectId: 'moneymaneger-v2',
+    storageBucket: 'moneymaneger-v2.firebasestorage.app',
     iosBundleId: 'com.example.moneyManager',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAmHz1Ys-fzYjlvvLgUDBVTpqQVA8tS-d4',
-    appId: '1:339362530098:web:5a5403fd25803901af0d2b',
-    messagingSenderId: '339362530098',
-    projectId: 'money-manager-2df2b',
-    authDomain: 'money-manager-2df2b.firebaseapp.com',
-    storageBucket: 'money-manager-2df2b.firebasestorage.app',
-    measurementId: 'G-JMZ40SGLP8',
+    apiKey: 'AIzaSyD9RlGnIvTjm2wdOSb3gixCiM4JMdlpkiw',
+    appId: '1:651605242767:web:fca02dad9cf783974951fa',
+    messagingSenderId: '651605242767',
+    projectId: 'moneymaneger-v2',
+    authDomain: 'moneymaneger-v2.firebaseapp.com',
+    storageBucket: 'moneymaneger-v2.firebasestorage.app',
+    measurementId: 'G-L88N1VHLSR',
   );
 }

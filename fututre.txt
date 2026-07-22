@@ -1,29 +1,272 @@
-بعض التعديلات علي الابلكيشن 
+دي الخطة اللي أنصح نمشي عليها من دلوقتي لحد ما يبقى نظام الـAuthentication مكتمل 100%، وكل خطوة مستقلة وسهلة الاختبار.
 
-مبدايا لما شغلته علي الفون ال 4 كروت اللي المفروض كانوا اتنين جنب بعض تحتهم 2 جنب بعض بقوا كلهم تحت بعض 
+---
 
-ثانيا في الماني هولدر الزرار اللي تحت جاي فوق البار 
+# ✅ المرحلة 1 — الأساسيات (خلصت)
 
-ثالثا لما بخض علي اي صفحة اذا كان بقا عن طريق ال بار اللي تحت او عن طريق الكروت اللي في الهوم 
+* ✅ إنشاء Firebase Project جديد
+* ✅ Firebase Auth (Email/Password)
+* ✅ Firestore
+* ✅ Firestore Rules
+* ✅ AuthGate
+* ✅ Login
+* ✅ Logout
+* ✅ Session Persistence
+* ✅ User Profile
+* ✅ Username Reservation
+* ✅ منع تكرار Username
+* ✅ تنظيف حساب Auth عند فشل التسجيل
 
-لو رجعت ورا بيقفل الابلكيشن كله 
+---
 
-عايز قفل الابلكيشن يبقا لما ادوس علي زرار الرجوع مرتين
+# 🚧 المرحلة 2 — تحسين تجربة تسجيل الدخول
 
-رابعا الظل بتاع الكارت البنفسجي اللي في الهوم ده مش مظبوط 
+## 2.1 Login بالإيميل فقط (مؤقتًا)
 
-خامسا الترانكشن اللي بتحصل لما بدوس علي اي زرار من ال 4 اللي تحت بتوع الصفحات وحش
+* ✅ Username يفضل موجود أثناء التسجيل.
+* ✅ Login بالإيميل فقط.
+* ✅ تجهيز كود Username Login للمستقبل.
 
-عايز ترانزكشن اكني بسكرول 
+---
 
-سادسا الترانزكشن بتاع لما افتح الكروت اللي في الهوم مش حلو
+## 2.2 Google Sign-In ⭐
 
-عايز اكن الكارت بيكبر كده ويبقي هو الصفحة 
+### Android
 
-سابعا ال quick access عايز يكون فيها اني اضيف dept و receivables و owners 
+* إضافة SHA-1 وSHA-256.
+* تفعيل Google Provider.
+* تسجيل الدخول بحساب Google.
 
-ثامنا الدارك مود 
+### Web
 
-تاسعا شكل اللوجن والساين اب بدائي اوي 
+* التأكد إنه يعمل على الويب.
 
-عاشرا الفرفكيشن والفورجيت باسورد 
+### بعد أول Login
+
+إذا كان أول مرة:
+
+```
+Google Login
+      ↓
+Choose Username
+      ↓
+Create users/{uid}
+      ↓
+Reserve username
+      ↓
+Home
+```
+
+إذا كان مستخدم قديم:
+
+```
+Google Login
+      ↓
+Home
+```
+
+---
+
+## 2.3 ربط الحسابات (Account Linking)
+
+لو نفس الإيميل موجود بالفعل:
+
+```
+Email Account
++
+Google Account
+↓
+
+linkWithCredential()
+
+↓
+
+Firebase UID واحد
+```
+
+بحيث يبقى للمستخدم حساب واحد فقط.
+
+---
+
+# 📧 المرحلة 3 — Email Verification
+
+للمستخدمين الذين سجلوا بالإيميل:
+
+```
+Register
+↓
+
+Create Auth User
+
+↓
+
+Create Firestore Profile
+
+↓
+
+sendEmailVerification()
+
+↓
+
+Verification Screen
+
+↓
+
+Reload User
+
+↓
+
+emailVerified == true
+
+↓
+
+Home
+```
+
+### المطلوب
+
+* صفحة Verify Email.
+* زر Resend Email.
+* زر Refresh.
+* منع الدخول قبل التحقق.
+
+---
+
+# 🔑 المرحلة 4 — Forgot Password
+
+من صفحة Login:
+
+```
+Forgot Password
+
+↓
+
+Enter Email
+
+↓
+
+Reset Email
+
+↓
+
+Success Screen
+```
+
+يشمل:
+
+* Validation.
+* Success Message.
+* Error Handling.
+* Rate Limiting Messages.
+
+---
+
+# 👤 المرحلة 5 — إعدادات الحساب
+
+## Profile
+
+* تعديل Display Name.
+* تغيير صورة الحساب.
+* تغيير Username (مع الحفاظ على الـUnique).
+* تحديث Email (بعد إعادة التحقق إذا لزم).
+* تغيير Password.
+* Delete Account.
+
+---
+
+# 🔒 المرحلة 6 — الأمان
+
+* Re-authentication للعمليات الحساسة.
+* تسجيل آخر وقت دخول.
+* Last Login.
+* Created At.
+* Linked Providers.
+* Logout from All Devices (لو هتضيف Sessions مستقبلًا).
+
+---
+
+# ⭐ المرحلة 7 — Username Login (عندما يتوفر Backend أو Blaze)
+
+تفعيل الكود الجاهز:
+
+```
+Email or Username
+
+↓
+
+Username
+
+↓
+
+Backend / Cloud Function
+
+↓
+
+Resolve Email
+
+↓
+
+Firebase Login
+
+↓
+
+Home
+```
+
+---
+
+# 🎨 المرحلة 8 — تحسين الـUX
+
+* Splash Animation.
+* Login Animation.
+* Success Animation.
+* Skeleton Loading.
+* Better Error Messages.
+* Password Strength Indicator.
+* Show/Hide Password.
+* Remember Me.
+
+---
+
+# 📱 المرحلة 9 — Google Account Enhancements
+
+* عرض صورة Google.
+* Display Name من Google.
+* مزامنة صورة الحساب.
+* Add Password Login من Settings (اختياري).
+* Unlink Google.
+* Link Google لحساب Email موجود.
+
+---
+
+# 🚀 المرحلة 10 — النسخة الاحترافية
+
+* App Check.
+* MFA (Two-Factor Authentication).
+* Device Management.
+* Login History.
+* Security Notifications.
+* Admin Dashboard.
+* Analytics.
+* Crash Reporting.
+
+---
+
+## 📍 الترتيب اللي أنصح نمشي بيه
+
+```
+✅ Firebase Setup
+✅ Email Login
+✅ Username Registration
+⬜ Google Sign-In
+⬜ Account Linking
+⬜ Email Verification
+⬜ Forgot Password
+⬜ Profile Settings
+⬜ Security
+⬜ Username Login (بعد Backend/Blaze)
+⬜ UX Improvements
+⬜ Production Hardening
+```
+
+بالترتيب ده هتكون بتبني النظام من الأساسيات إلى المزايا المتقدمة، وكل مرحلة تعتمد على اللي قبلها بدون تعقيد أو إعادة شغل.
