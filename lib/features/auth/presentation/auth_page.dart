@@ -93,6 +93,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   if (!_isSubmitting) _login();
                 },
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isSubmitting ? null : _openPasswordReset,
+                  child: const Text('Forgot password?'),
+                ),
+              ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 child: _message == null
@@ -183,6 +190,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _openPasswordReset() async {
+    final authService = ref.read(authServiceProvider);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _PasswordResetDialog(
+        initialEmail: _emailController.text.trim(),
+        authService: authService,
+      ),
+    );
   }
 
   String _friendlyLoginAuthError(FirebaseAuthException error) {
@@ -467,6 +486,184 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 }
 
+class _PasswordResetDialog extends StatefulWidget {
+  const _PasswordResetDialog({
+    required this.initialEmail,
+    required this.authService,
+  });
+
+  final String initialEmail;
+  final AuthService authService;
+
+  @override
+  State<_PasswordResetDialog> createState() => _PasswordResetDialogState();
+}
+
+class _PasswordResetDialogState extends State<_PasswordResetDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController;
+  bool _isSending = false;
+  bool _isSuccess = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(
+      text: widget.initialEmail.trim().toLowerCase(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Reset password'),
+      content: Form(
+        key: _formKey,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Enter your email address and we’ll send you a password '
+                'reset link.',
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _emailController,
+                enabled: !_isSending && !_isSuccess,
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.email],
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'you@company.com',
+                  prefixIcon: Icon(Icons.alternate_email_rounded),
+                ),
+                validator: _validateResetEmail,
+                onFieldSubmitted: (_) {
+                  if (!_isSending && !_isSuccess) _sendResetLink();
+                },
+              ),
+              if (_message != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(_message!),
+              ],
+              if (_isSuccess) ...[
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'If an account can receive recovery email, a password '
+                  'reset link has been sent.',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'Check your Inbox, Spam, or Promotions folder. The email '
+                  'may take a few minutes to arrive.',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'After changing your password, return here and sign in '
+                  'with the new password.',
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+          child: Text(_isSuccess ? 'Close' : 'Cancel'),
+        ),
+        if (!_isSuccess)
+          FilledButton(
+            onPressed: _isSending ? null : _sendResetLink,
+            child: _isSending
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Send reset link'),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _sendResetLink() async {
+    if (_isSending || _isSuccess) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    final authService = widget.authService;
+    final normalizedEmail = _emailController.text.trim().toLowerCase();
+    setState(() {
+      _isSending = true;
+      _message = null;
+    });
+    try {
+      await authService.sendPasswordResetEmail(normalizedEmail);
+      if (mounted) _showSuccess();
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      if (error.code == 'user-not-found') {
+        _showSuccess();
+      } else {
+        setState(() => _message = _passwordResetError(error));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _message =
+              'Could not send the reset link. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  void _showSuccess() {
+    setState(() {
+      _isSuccess = true;
+      _message = 'Password reset link sent.';
+    });
+  }
+
+  String? _validateResetEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return 'Email is required.';
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      return 'Enter a valid email address.';
+    }
+    return null;
+  }
+
+  String _passwordResetError(FirebaseAuthException error) {
+    return switch (error.code) {
+      'invalid-email' => 'Enter a valid email address.',
+      'too-many-requests' =>
+        'Too many requests were made. Please wait before trying again.',
+      'network-request-failed' =>
+        'Could not connect. Check your internet connection and try again.',
+      'operation-not-allowed' =>
+        'Password reset is not currently available.',
+      'user-disabled' =>
+        'Password reset could not be completed. Please try again later.',
+      'internal-error' =>
+        'Password reset is temporarily unavailable. Please try again.',
+      _ => 'Could not send the reset link. Please try again.',
+    };
+  }
+}
+
 enum _RecoveryAction { backToLogin }
 
 class _EmailRecoveryDialog extends StatefulWidget {
@@ -633,7 +830,8 @@ class _EmailVerificationPageState
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Open the link in your inbox, then return here and confirm.',
+            'Check your Inbox, Spam, or Promotions folder.\n'
+            'The email may take a few minutes to arrive.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -645,7 +843,7 @@ class _EmailVerificationPageState
           ],
           const SizedBox(height: AppSpacing.xl),
           _GradientAuthButton(
-            label: 'I have verified my email',
+            label: 'I’ve verified my email',
             icon: Icons.verified_rounded,
             isLoading: _isChecking,
             onPressed: _isBusy ? null : _checkVerification,
@@ -692,7 +890,6 @@ class _EmailVerificationPageState
       final refreshedUser = await authService.reloadCurrentUser();
       if (!mounted) return;
       if (refreshedUser.emailVerified) {
-        ref.invalidate(authStateProvider);
         return;
       }
       setState(() => _message = 'Your email is not verified yet.');
@@ -722,7 +919,11 @@ class _EmailVerificationPageState
       await authService.sendCurrentUserEmailVerification();
       if (!mounted) return;
       verificationEmail.markSent(widget.user.uid);
-      setState(() => _message = 'Verification email sent.');
+      setState(
+        () => _message =
+            'Verification email sent. Check your Inbox, Spam, or '
+            'Promotions folder.',
+      );
       _startCooldown();
     } on FirebaseAuthException catch (error) {
       verificationEmail.markFailed(widget.user.uid);
@@ -777,12 +978,13 @@ class _EmailVerificationPageState
   String _verificationError(FirebaseAuthException error) {
     return switch (error.code) {
       'too-many-requests' =>
-        'Too many attempts. Please wait and try again.',
+        'Too many requests were made. Please wait a while before trying again.',
       'network-request-failed' =>
         'Network error. Check your connection and try again.',
       'user-disabled' => 'This account has been disabled.',
       'user-not-found' => 'This account is no longer available.',
       'requires-recent-login' => 'Please sign in again and retry.',
+      'unauthenticated' => 'Your session expired. Please sign in again.',
       'invalid-user-token' || 'user-token-expired' =>
         'Your session expired. Please sign in again.',
       _ => 'Authentication request failed. Please try again.',
@@ -891,13 +1093,21 @@ class _UsernameOnboardingPageState
   }
 
   Future<void> _completeProfile() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
+
+    final authService = ref.read(authServiceProvider);
     setState(() {
       _isSubmitting = true;
       _message = null;
     });
+
+    if (kDebugMode) {
+      debugPrint('Username onboarding submit started.');
+    }
+
     try {
-      await ref.read(authServiceProvider).completeUserProfile(
+      await authService.completeUserProfile(
             user: widget.user,
             username: _usernameController.text,
           );
@@ -916,8 +1126,12 @@ class _UsernameOnboardingPageState
           () => _message = switch (error.code) {
             'permission-denied' =>
               'Profile setup was denied. Please try again or log out.',
-            'unavailable' || 'deadline-exceeded' =>
+            'unavailable' ||
+            'network-request-failed' ||
+            'deadline-exceeded' =>
               'Profile setup could not reach the server. Please try again.',
+            'aborted' =>
+              'Username setup was interrupted. Please try again.',
             _ => 'Profile setup failed. Please try again.',
           },
         );

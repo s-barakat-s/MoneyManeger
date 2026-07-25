@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase/firebase_providers.dart';
@@ -61,6 +62,7 @@ class _SettingsContent extends ConsumerStatefulWidget {
 class _SettingsContentState extends ConsumerState<_SettingsContent> {
   bool _isSigningOut = false;
   bool _isSettingPassword = false;
+  bool _isRefreshing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -69,31 +71,27 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     final profileStream = firestore
         .collection('users')
         .doc(widget.user.uid)
-        .collection('profile')
-        .doc('main')
         .snapshots();
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: profileStream,
       builder: (context, snapshot) {
         final profile = snapshot.data?.data() ?? {};
-        final name = _profileValue(profile['name']) ??
-            widget.user.displayName ??
-            widget.user.email ??
-            'Not set';
-        final email =
-            _profileValue(profile['email']) ?? widget.user.email ?? 'Not set';
+        final name = _profileValue(profile['username']) ??
+            _profileValue(widget.user.displayName) ??
+            'User';
+        final email = widget.user.email ?? 'Not set';
         final currentUser = FirebaseAuth.instance.currentUser ?? widget.user;
-        final hasGoogle = currentUser.providerData.any(
-          (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
-        );
         final hasPassword = currentUser.providerData.any(
           (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
         );
 
-        return ListView(
-          padding: AppBottomNavSpacer.listPadding(context),
-          children: [
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: AppBottomNavSpacer.listPadding(context),
+            children: [
             const PageHeader(
               title: 'Settings',
               subtitle: 'Manage your account and app preferences',
@@ -102,51 +100,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             _AccountCard(
               name: name,
               email: email,
-              onEdit: () => _showEditProfileDialog(context, name, email),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const _SectionTitle('Sign-in methods'),
-            const SizedBox(height: AppSpacing.sm),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.g_mobiledata_rounded,
-                    iconColor: AppColors.info,
-                    title: 'Google',
-                    subtitle: hasGoogle ? 'Connected' : 'Not connected',
-                    trailing: Icon(
-                      hasGoogle
-                          ? Icons.check_circle_rounded
-                          : Icons.remove_circle_outline_rounded,
-                      color: hasGoogle ? AppColors.success : null,
-                    ),
-                  ),
-                  const Divider(height: AppSpacing.xl),
-                  _SettingsTile(
-                    icon: Icons.password_rounded,
-                    iconColor: AppColors.primary,
-                    title: 'Email & Password',
-                    subtitle: hasPassword ? 'Connected' : 'Not configured',
-                    trailing: _isSettingPassword
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : hasGoogle && !hasPassword
-                            ? const Text('Set password')
-                            : Icon(
-                                hasPassword
-                                    ? Icons.check_circle_rounded
-                                    : Icons.remove_circle_outline_rounded,
-                                color: hasPassword ? AppColors.success : null,
-                              ),
-                    onTap: hasGoogle && !hasPassword && !_isSettingPassword
-                        ? _setPassword
-                        : null,
-                  ),
-                ],
-              ),
+              onEdit: () => _showEditProfileDialog(context, name),
             ),
             const SizedBox(height: AppSpacing.xl),
             const _SectionTitle('Appearance'),
@@ -162,35 +116,49 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            const _SectionTitle('App'),
-            const SizedBox(height: AppSpacing.sm),
-            const _SettingsCard(
-              child: _SettingsTile(
-                icon: Icons.account_balance_wallet_rounded,
-                iconColor: AppColors.info,
-                title: 'Money Manager',
-                subtitle: 'Small business finance management',
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
             const _SectionTitle('Account'),
             const SizedBox(height: AppSpacing.sm),
             _SettingsCard(
-              child: _SettingsTile(
-                icon: Icons.logout_rounded,
-                iconColor: AppColors.danger,
-                title: 'Log out',
-                subtitle: 'Sign out of this account',
-                trailing: _isSigningOut
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.chevron_right_rounded),
-                onTap: _isSigningOut ? null : _signOut,
+              child: Column(
+                children: [
+                  _SettingsTile(
+                    icon: Icons.password_rounded,
+                    iconColor: AppColors.primary,
+                    title: hasPassword ? 'Change password' : 'Set password',
+                    subtitle: hasPassword
+                        ? 'Update your app account password.'
+                        : 'Create a password to sign in without Google.',
+                    trailing: _isSettingPassword
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right_rounded),
+                    onTap: _isSettingPassword
+                        ? null
+                        : hasPassword
+                            ? _changePassword
+                            : _setPassword,
+                  ),
+                  const Divider(height: AppSpacing.xl),
+                  _SettingsTile(
+                    icon: Icons.logout_rounded,
+                    iconColor: AppColors.danger,
+                    title: 'Log out',
+                    subtitle: 'Sign out of this account',
+                    trailing: _isSigningOut
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right_rounded),
+                    onTap: _isSigningOut ? null : _signOut,
+                  ),
+                ],
               ),
             ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -198,17 +166,54 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
 
   Future<void> _showEditProfileDialog(
     BuildContext context,
-    String name,
-    String email,
+    String username,
   ) {
+    final authService = ref.read(authServiceProvider);
     return showDialog<void>(
       context: context,
       builder: (context) => _EditProfileDialog(
-        user: widget.user,
-        initialName: name == 'Not set' ? '' : name,
-        email: email,
+        initialUsername: username == 'User' ? '' : username,
+        authService: authService,
       ),
     );
+  }
+
+  Future<void> _refresh() async {
+    if (_isRefreshing) return;
+    final firestore = ref.read(firebaseFirestoreProvider);
+    final auth = FirebaseAuth.instance;
+    setState(() => _isRefreshing = true);
+    try {
+      await auth.currentUser?.reload();
+      final refreshedUser = auth.currentUser;
+      if (refreshedUser != null) {
+        await firestore
+            .collection('users')
+            .doc(refreshedUser.uid)
+            .get(const GetOptions(source: Source.server));
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (kDebugMode) {
+        if (error is FirebaseException) {
+          debugPrint(
+            'Settings refresh failed: ${error.runtimeType}, '
+            'code=${error.code}, message=${error.message}',
+          );
+        } else {
+          debugPrint('Settings refresh failed: ${error.runtimeType}.');
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not refresh Settings. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
   }
 
   Future<void> _showThemeModeDialog(
@@ -219,23 +224,23 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Appearance'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final mode in ThemeMode.values)
-              RadioListTile<ThemeMode>(
-                value: mode,
-                groupValue: selectedMode,
-                title: Text(_themeModeLabel(mode)),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  ref.read(themeModeProvider.notifier).setThemeMode(value);
-                  Navigator.of(dialogContext).pop();
-                },
-              ),
-          ],
+        content: RadioGroup<ThemeMode>(
+          groupValue: selectedMode,
+          onChanged: (value) {
+            if (value == null) return;
+            ref.read(themeModeProvider.notifier).setThemeMode(value);
+            Navigator.of(dialogContext).pop();
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in ThemeMode.values)
+                RadioListTile<ThemeMode>(
+                  value: mode,
+                  title: Text(_themeModeLabel(mode)),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -317,6 +322,33 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       }
     } finally {
       if (mounted) setState(() => _isSettingPassword = false);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final authService = ref.read(authServiceProvider);
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email?.trim();
+    if (user == null) {
+      _showMessage('No user is signed in.');
+      return;
+    }
+    if (email == null || email.isEmpty) {
+      _showMessage('Your account does not have an email address.');
+      return;
+    }
+
+    final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _ChangePasswordDialog(
+        email: email,
+        authService: authService,
+      ),
+    );
+    if (!mounted) return;
+    if (changed == true) {
+      _showMessage('Password changed successfully.');
     }
   }
 
@@ -505,6 +537,239 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
   }
 }
 
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({
+    required this.email,
+    required this.authService,
+  });
+
+  final String email;
+  final AuthService authService;
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _obscureCurrentPassword = true;
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmation = true;
+  bool _isSubmitting = false;
+  bool _isSendingReset = false;
+  String? _message;
+
+  @override
+  void dispose() {
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isBusy = _isSubmitting || _isSendingReset;
+    return AlertDialog(
+      title: const Text('Change password'),
+      content: Form(
+        key: _formKey,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _currentPasswordController,
+                  obscureText: _obscureCurrentPassword,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'Current password',
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(
+                        () => _obscureCurrentPassword =
+                            !_obscureCurrentPassword,
+                      ),
+                      icon: Icon(
+                        _obscureCurrentPassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) => (value ?? '').isEmpty
+                      ? 'Current password is required.'
+                      : null,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _newPasswordController,
+                  obscureText: _obscureNewPassword,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'New password',
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(
+                        () => _obscureNewPassword = !_obscureNewPassword,
+                      ),
+                      icon: Icon(
+                        _obscureNewPassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: _validateNewPassword,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _confirmationController,
+                  obscureText: _obscureConfirmation,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm new password',
+                    suffixIcon: IconButton(
+                      onPressed: () => setState(
+                        () => _obscureConfirmation = !_obscureConfirmation,
+                      ),
+                      icon: Icon(
+                        _obscureConfirmation
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value != _newPasswordController.text) {
+                      return 'Passwords do not match.';
+                    }
+                    return _validateNewPassword(value);
+                  },
+                  onFieldSubmitted: (_) {
+                    if (!isBusy) _submit();
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: isBusy ? null : _sendPasswordReset,
+                    child: Text(
+                      _isSendingReset
+                          ? 'Sending reset link...'
+                          : 'Forgot your current password?',
+                    ),
+                  ),
+                ),
+                if (_message != null)
+                  Text(
+                    _message!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: isBusy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: isBusy ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Change password'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || _isSendingReset) return;
+    if (!_formKey.currentState!.validate()) return;
+    if (_newPasswordController.text == _currentPasswordController.text) {
+      setState(() {
+        _message = 'New password must be different from current password.';
+      });
+      return;
+    }
+
+    final authService = widget.authService;
+    setState(() {
+      _isSubmitting = true;
+      _message = null;
+    });
+    try {
+      await authService.changeCurrentUserPassword(
+        currentPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on FirebaseAuthException catch (error) {
+      if (mounted) setState(() => _message = _passwordChangeError(error));
+    } on MissingCurrentUserEmailException {
+      if (mounted) {
+        setState(() => _message = 'Your account has no email address.');
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Password change failed: ${error.runtimeType}.');
+      }
+      if (mounted) {
+        setState(() => _message = 'Could not change password. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _sendPasswordReset() async {
+    if (_isSubmitting || _isSendingReset) return;
+    final authService = widget.authService;
+    setState(() {
+      _isSendingReset = true;
+      _message = null;
+    });
+    try {
+      await authService.sendPasswordRecoveryEmail(email: widget.email);
+      if (mounted) {
+        setState(
+          () => _message =
+              'A password reset link has been sent. Check your Spam or '
+              'Promotions folder if you cannot find it.',
+        );
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) setState(() => _message = _passwordResetError(error));
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Password reset request failed: ${error.runtimeType}.');
+      }
+      if (mounted) {
+        setState(() => _message = 'Could not send the reset link. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingReset = false);
+    }
+  }
+
+  String? _validateNewPassword(String? value) {
+    if ((value ?? '').isEmpty) return 'Password is required.';
+    if (value!.length < 8) return 'Password must be at least 8 characters.';
+    return null;
+  }
+}
+
 String _passwordLinkError(FirebaseAuthException error) {
   return switch (error.code) {
     'provider-already-linked' => 'Email & Password is already connected.',
@@ -518,11 +783,51 @@ String _passwordLinkError(FirebaseAuthException error) {
       'Email and password sign-in is not enabled.',
     'network-request-failed' =>
       'Network error. Check your connection and try again.',
+    'too-many-requests' => 'Too many attempts. Please wait and try again.',
     'user-mismatch' => 'Google verification used a different account.',
     'user-disabled' => 'This account has been disabled.',
+    'user-not-found' => 'This account is no longer available.',
+    'invalid-user-token' || 'user-token-expired' =>
+      'Your session expired. Please sign in again.',
     'popup-closed-by-user' || 'cancelled-popup-request' || 'canceled' =>
       'Google re-authentication was cancelled.',
     _ => 'Authentication failed. Please try again.',
+  };
+}
+
+String _passwordChangeError(FirebaseAuthException error) {
+  return switch (error.code) {
+    'wrong-password' || 'invalid-credential' =>
+      'The current password is incorrect.',
+    'weak-password' => 'Use a stronger password with at least 8 characters.',
+    'requires-recent-login' =>
+      'Please sign in again before changing your password.',
+    'network-request-failed' =>
+      'Network error. Check your connection and try again.',
+    'too-many-requests' => 'Too many attempts. Please wait and try again.',
+    'user-disabled' => 'This account has been disabled.',
+    'user-not-found' => 'This account is no longer available.',
+    'operation-not-allowed' =>
+      'Email and password sign-in is not enabled.',
+    'invalid-user-token' || 'user-token-expired' =>
+      'Your session expired. Please sign in again.',
+    'provider-already-linked' => 'A password is already configured.',
+    'credential-already-in-use' =>
+      'These credentials are already used by another account.',
+    _ => 'Could not change password. Please try again.',
+  };
+}
+
+String _passwordResetError(FirebaseAuthException error) {
+  return switch (error.code) {
+    'network-request-failed' =>
+      'Network error. Check your connection and try again.',
+    'too-many-requests' => 'Too many requests. Please wait and try again.',
+    'operation-not-allowed' =>
+      'Password reset is not currently available.',
+    'invalid-user-token' || 'user-token-expired' =>
+      'Your session expired. Please sign in again.',
+    _ => 'Could not send the reset link. Try again.',
   };
 }
 
@@ -539,7 +844,7 @@ class _AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _initialsFor(name, email);
+    final initial = _initialFor(name);
 
     return _SettingsCard(
       child: Row(
@@ -548,7 +853,7 @@ class _AccountCard extends StatelessWidget {
             radius: 28,
             backgroundColor: Theme.of(context).colorScheme.primaryContainer,
             child: Text(
-              initials,
+              initial,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w800,
@@ -590,63 +895,48 @@ class _AccountCard extends StatelessWidget {
     );
   }
 
-  String _initialsFor(String name, String email) {
-    final source = name == 'Not set' ? email : name;
-    final parts = source
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) {
-      return 'MM';
-    }
-
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-
-    return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
-        .toUpperCase();
+  String _initialFor(String name) {
+    final visibleName = name.trim();
+    if (visibleName.isEmpty) return 'U';
+    return visibleName.characters.first.toUpperCase();
   }
 }
 
-class _EditProfileDialog extends ConsumerStatefulWidget {
+class _EditProfileDialog extends StatefulWidget {
   const _EditProfileDialog({
-    required this.user,
-    required this.initialName,
-    required this.email,
+    required this.initialUsername,
+    required this.authService,
   });
 
-  final User user;
-  final String initialName;
-  final String email;
+  final String initialUsername;
+  final AuthService authService;
 
   @override
-  ConsumerState<_EditProfileDialog> createState() => _EditProfileDialogState();
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
 }
 
-class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
+class _EditProfileDialogState extends State<_EditProfileDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
+  late final TextEditingController _usernameController;
   bool _isSaving = false;
+  String? _message;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.initialName);
+    _usernameController = TextEditingController(text: widget.initialUsername);
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Edit profile'),
+      title: const Text('Edit username'),
       content: Form(
         key: _formKey,
         child: ConstrainedBox(
@@ -655,26 +945,29 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  hintText: 'your_username',
+                ),
                 textInputAction: TextInputAction.done,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Name cannot be empty';
-                  }
-
-                  return null;
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                ],
+                validator: _validateUsername,
+                onFieldSubmitted: (_) {
+                  if (!_isSaving) _save();
                 },
               ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                initialValue: widget.email,
-                enabled: false,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  helperText: 'Email changes are not available here yet.',
+              if (_message != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  _message!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -698,35 +991,60 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_isSaving) return;
+    if (!_formKey.currentState!.validate()) return;
+    final normalizedUsername =
+        _usernameController.text.trim().toLowerCase();
+    if (normalizedUsername == widget.initialUsername.trim().toLowerCase()) {
+      Navigator.of(context).pop();
       return;
     }
 
-    setState(() => _isSaving = true);
-
+    final authService = widget.authService;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _isSaving = true;
+      _message = null;
+    });
     try {
-      final name = _nameController.text.trim();
-      await ref
-          .read(firebaseFirestoreProvider)
-          .collection('users')
-          .doc(widget.user.uid)
-          .collection('profile')
-          .doc('main')
-          .set({
-        'name': name,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
+      await authService.changeCurrentUsername(normalizedUsername);
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated.')),
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Username updated successfully.')),
         );
       }
-    } catch (_) {
+    } on UsernameAlreadyTakenException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not update profile.')),
+        setState(() => _message = 'This username is already taken.');
+      }
+    } on InvalidUsernameException {
+      if (mounted) setState(() => _message = 'Enter a valid username.');
+    } on FirebaseException catch (error) {
+      if (mounted) {
+        setState(
+          () => _message = switch (error.code) {
+            'permission-denied' =>
+              'Username update was denied. Please try again.',
+            'unavailable' || 'network-request-failed' =>
+              'Could not connect. Check your connection and try again.',
+            'aborted' =>
+              'Username update was interrupted. Please try again.',
+            'deadline-exceeded' =>
+              'The request timed out. Please try again.',
+            'unauthenticated' =>
+              'Your session expired. Please sign in again.',
+            _ => 'Could not update username. Please try again.',
+          },
+        );
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Username update failed: ${error.runtimeType}.');
+      }
+      if (mounted) {
+        setState(
+          () => _message = 'Could not update username. Please try again.',
         );
       }
     } finally {
@@ -734,6 +1052,18 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  String? _validateUsername(String? value) {
+    final username = value?.trim().toLowerCase() ?? '';
+    if (username.isEmpty) return 'Username is required.';
+    if (username.length < 3 || username.length > 20) {
+      return 'Username must be 3 to 20 characters.';
+    }
+    if (!RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username)) {
+      return 'Use only lowercase letters, numbers, and underscores.';
+    }
+    return null;
   }
 }
 

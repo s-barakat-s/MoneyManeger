@@ -120,12 +120,6 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     );
   }
 
-  bool get _hasActiveFilters {
-    return _searchText.trim().isNotEmpty ||
-        _selectedType != null ||
-        _selectedOwnerId != null;
-  }
-
   bool get _hasPanelFilters {
     return _selectedType != null || _selectedOwnerId != null;
   }

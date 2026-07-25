@@ -2,16 +2,101 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isOwner(userId) && isVerified();
+    }
+
+    function hasKnownProfileFields() {
+      return request.resource.data.keys().hasOnly([
+        'uid',
+        'email',
+        'username',
+        'displayName',
+        'photoUrl',
+        'provider',
+        'providers',
+        'profileCompleted',
+        'createdAt',
+        'updatedAt'
+      ]);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && hasKnownProfileFields();
+
+      allow update: if isOwner(userId)
+        && hasKnownProfileFields()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username',
+          'displayName',
+          'photoUrl',
+          'provider',
+          'providers',
+          'updatedAt',
+          'profileCompleted'
+        ])
+        && request.resource.data.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      match /{collection}/{documentId}/{nestedDocument=**} {
+        allow read, write: if isVerifiedOwner(userId);
+      }
     }
 
     match /usernames/{username} {
-      allow get: if request.auth != null;
-      allow create: if request.auth != null
+      allow get: if isVerified();
+
+      allow create: if isVerified()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.username == username;
+        && request.resource.data.username == username
+        && request.resource.data.keys().hasAll([
+          'uid',
+          'username',
+          'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'username',
+          'createdAt',
+          'updatedAt'
+        ])
+        && !exists(/databases/$(database)/documents/usernames/$(username));
+
+      allow update: if isVerified()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username == username
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'username',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'username',
+          'updatedAt'
+        ]);
+
+      allow delete: if isVerified()
+        && resource.data.uid == request.auth.uid;
     }
 
     match /{document=**} {

@@ -20,7 +20,6 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../company_assets/application/company_asset_providers.dart';
-import '../application/dashboard_summary_providers.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
 

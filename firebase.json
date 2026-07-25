@@ -9,13 +9,6 @@
           "projectId": "moneymaneger-v2",
           "appId": "1:651605242767:android:0b07b5d8e2f7ca694951fa",
           "fileOutput": "android/app/google-services.json"
-        },
-        "buildConfigurations": {
-          ".": {
-            "projectId": "money-manager-2df2b",
-            "appId": "1:339362530098:android:363148fd3f9854efaf0d2b",
-            "fileOutput": "android/app/google-services.json"
-          }
         }
       },
       "dart": {
@@ -31,5 +24,11 @@
         }
       }
     }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "europe-west1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }
