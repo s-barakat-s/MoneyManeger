@@ -17,6 +17,8 @@ final deleteTransferProvider = Provider<DeleteTransfer>((ref) {
   return DeleteTransfer(ref.watch(transferRepositoryProvider));
 });
 
-final watchTransfersProvider = Provider<Stream<List<Transfer>> Function()>((ref) {
+final watchTransfersProvider = Provider<Stream<List<Transfer>> Function()>((
+  ref,
+) {
   return ref.watch(transferRepositoryProvider).watchTransfers;
 });

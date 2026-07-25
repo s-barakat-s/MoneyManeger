@@ -22,10 +22,7 @@ class ResponsiveDialogContent extends StatelessWidget {
     final maxHeight = math.max(120.0, availableHeight * maxHeightFactor);
 
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: maxWidth,
-        maxHeight: maxHeight,
-      ),
+      constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
       child: SingleChildScrollView(child: child),
     );
   }

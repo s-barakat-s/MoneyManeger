@@ -33,7 +33,9 @@ final assetsStreamProvider = StreamProvider.autoDispose<List<CompanyAsset>>((
   return ref.watch(watchAssetsProvider)();
 });
 
-final totalAssetsValueProvider = Provider.autoDispose<AsyncValue<double>>((ref) {
+final totalAssetsValueProvider = Provider.autoDispose<AsyncValue<double>>((
+  ref,
+) {
   final assets = ref.watch(assetsStreamProvider);
 
   return assets.whenData(

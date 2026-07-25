@@ -80,84 +80,85 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
         child: DefaultTabController(
           length: 2,
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PageHeader(
-              title: 'Debts',
-              actionLabel: 'Add debt',
-              onAction: () => _showAddDialog(context),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            summaryAsync.when(
-              data: (summary) => _SummaryCard(
-                label: 'Total debts',
-                value: formatEgpCurrency(summary.remaining),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PageHeader(
+                title: 'Debts',
+                actionLabel: 'Add debt',
+                onAction: () => _showAddDialog(context),
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (error, stackTrace) => const ErrorState(
-                title: 'Debt summary unavailable',
-                message: 'We could not load your debt summary right now.',
+              const SizedBox(height: AppSpacing.md),
+              summaryAsync.when(
+                data: (summary) => _SummaryCard(
+                  label: 'Total debts',
+                  value: formatEgpCurrency(summary.remaining),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (error, stackTrace) => const ErrorState(
+                  title: 'Debt summary unavailable',
+                  message: 'We could not load your debt summary right now.',
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AppSearchFilterBar(
-              controller: _searchController,
-              hintText: 'Search debts',
-              filtersActive: _hasPanelFilters,
-              onFilterTap: _showFilterSheet,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TabBar(
-              dividerColor: Theme.of(context).colorScheme.outline,
-              indicatorColor: AppColors.primary,
-              labelColor: AppColors.primary,
-              unselectedLabelColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-              tabs: const [
-                Tab(text: 'Active'),
-                Tab(text: 'Archived'),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  activeDebtsAsync.when(
-                    data: (debts) => _DebtsList(
-                      debts: debts,
-                      searchText: _searchText,
-                      statusFilter: _statusFilter,
-                      onClearFilters: _clearAllFilters,
-                      emptyTitle: 'No active debts',
-                      emptyDescription:
-                          'Debts you owe will appear here once added.',
-                    ),
-                    loading: () => const LoadingSkeleton(itemCount: 4),
-                    error: (error, stackTrace) => const ErrorState(
-                      title: 'Debts unavailable',
-                      message: 'We could not load active debts right now.',
-                    ),
-                  ),
-                  archivedDebtsAsync.when(
-                    data: (debts) => _DebtsList(
-                      debts: debts,
-                      searchText: _searchText,
-                      statusFilter: _statusFilter,
-                      onClearFilters: _clearAllFilters,
-                      emptyTitle: 'No archived debts',
-                      emptyDescription:
-                          'Archived debts will appear here when you archive them.',
-                    ),
-                    loading: () => const LoadingSkeleton(itemCount: 4),
-                    error: (error, stackTrace) => const ErrorState(
-                      title: 'Archived debts unavailable',
-                      message: 'We could not load archived debts right now.',
-                    ),
-                  ),
+              const SizedBox(height: AppSpacing.lg),
+              AppSearchFilterBar(
+                controller: _searchController,
+                hintText: 'Search debts',
+                filtersActive: _hasPanelFilters,
+                onFilterTap: _showFilterSheet,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TabBar(
+                dividerColor: Theme.of(context).colorScheme.outline,
+                indicatorColor: AppColors.primary,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
+                tabs: const [
+                  Tab(text: 'Active'),
+                  Tab(text: 'Archived'),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    activeDebtsAsync.when(
+                      data: (debts) => _DebtsList(
+                        debts: debts,
+                        searchText: _searchText,
+                        statusFilter: _statusFilter,
+                        onClearFilters: _clearAllFilters,
+                        emptyTitle: 'No active debts',
+                        emptyDescription:
+                            'Debts you owe will appear here once added.',
+                      ),
+                      loading: () => const LoadingSkeleton(itemCount: 4),
+                      error: (error, stackTrace) => const ErrorState(
+                        title: 'Debts unavailable',
+                        message: 'We could not load active debts right now.',
+                      ),
+                    ),
+                    archivedDebtsAsync.when(
+                      data: (debts) => _DebtsList(
+                        debts: debts,
+                        searchText: _searchText,
+                        statusFilter: _statusFilter,
+                        onClearFilters: _clearAllFilters,
+                        emptyTitle: 'No archived debts',
+                        emptyDescription:
+                            'Archived debts will appear here when you archive them.',
+                      ),
+                      loading: () => const LoadingSkeleton(itemCount: 4),
+                      error: (error, stackTrace) => const ErrorState(
+                        title: 'Archived debts unavailable',
+                        message: 'We could not load archived debts right now.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -231,10 +232,7 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-  });
+  const _SummaryCard({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -253,7 +251,10 @@ class _SummaryCard extends StatelessWidget {
               children: [
                 Text(label, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: AppSpacing.xs),
-                AmountText(amountText: value, variant: AmountTextVariant.expense),
+                AmountText(
+                  amountText: value,
+                  variant: AmountTextVariant.expense,
+                ),
               ],
             ),
           ),
@@ -290,15 +291,16 @@ class _DebtsList extends StatelessWidget {
           .clamp(0, double.infinity)
           .toDouble();
       final note = debt.note?.trim() ?? '';
-      final matchesSearch = normalizedSearch.isEmpty ||
+      final matchesSearch =
+          normalizedSearch.isEmpty ||
           debt.personName.toLowerCase().contains(normalizedSearch) ||
           note.toLowerCase().contains(normalizedSearch) ||
-          formatEgpCurrency(debt.totalAmount)
-              .toLowerCase()
-              .contains(normalizedSearch) ||
-          formatEgpCurrency(remainingAmount)
-              .toLowerCase()
-              .contains(normalizedSearch);
+          formatEgpCurrency(
+            debt.totalAmount,
+          ).toLowerCase().contains(normalizedSearch) ||
+          formatEgpCurrency(
+            remainingAmount,
+          ).toLowerCase().contains(normalizedSearch);
       final matchesStatus = _matchesDebtStatus(debt, statusFilter);
 
       return matchesSearch && matchesStatus;
@@ -330,7 +332,8 @@ class _DebtsList extends StatelessWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleDebts.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) => _DebtListItem(debt: visibleDebts[index]),
     );
   }
@@ -376,7 +379,8 @@ class _DebtFilterSheetState extends State<_DebtFilterSheet> {
               AppFilterOption(
                 label: 'All',
                 selected: _status == _DebtStatusFilter.all,
-                onSelected: () => setState(() => _status = _DebtStatusFilter.all),
+                onSelected: () =>
+                    setState(() => _status = _DebtStatusFilter.all),
               ),
               AppFilterOption(
                 label: 'Active',
@@ -393,7 +397,8 @@ class _DebtFilterSheetState extends State<_DebtFilterSheet> {
               AppFilterOption(
                 label: 'Paid',
                 selected: _status == _DebtStatusFilter.paid,
-                onSelected: () => setState(() => _status = _DebtStatusFilter.paid),
+                onSelected: () =>
+                    setState(() => _status = _DebtStatusFilter.paid),
               ),
             ],
           ),
@@ -432,7 +437,9 @@ class _DebtListItem extends ConsumerWidget {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
-                  debt.personName.isEmpty ? 'Unnamed creditor' : debt.personName,
+                  debt.personName.isEmpty
+                      ? 'Unnamed creditor'
+                      : debt.personName,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium,
@@ -446,20 +453,17 @@ class _DebtListItem extends ConsumerWidget {
                 onArchive: () => _showDeleteDialog(context, debt),
                 onMarkPaid: remainingAmount > 0
                     ? () => _showPaymentDialog(
-                          context,
-                          debt,
-                          remainingAmount,
-                          prefillAmount: remainingAmount,
-                        )
+                        context,
+                        debt,
+                        remainingAmount,
+                        prefillAmount: remainingAmount,
+                      )
                     : null,
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Remaining',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('Remaining', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSpacing.xs),
           AmountText(
             amountText: formatEgpCurrency(remainingAmount),
@@ -470,8 +474,14 @@ class _DebtListItem extends ConsumerWidget {
             spacing: AppSpacing.md,
             runSpacing: AppSpacing.xs,
             children: [
-              _MetaText(label: 'Total', value: formatEgpCurrency(debt.totalAmount)),
-              _MetaText(label: 'Paid', value: formatEgpCurrency(debt.paidAmount)),
+              _MetaText(
+                label: 'Total',
+                value: formatEgpCurrency(debt.totalAmount),
+              ),
+              _MetaText(
+                label: 'Paid',
+                value: formatEgpCurrency(debt.paidAmount),
+              ),
               if (debt.dueDate != null)
                 _MetaText(label: 'Due', value: _formatDate(debt.dueDate!)),
             ],
@@ -495,11 +505,7 @@ class _DebtListItem extends ConsumerWidget {
           if (isActive)
             FilledButton.icon(
               onPressed: remainingAmount > 0
-                  ? () => _showPaymentDialog(
-                        context,
-                        debt,
-                        remainingAmount,
-                      )
+                  ? () => _showPaymentDialog(context, debt, remainingAmount)
                   : null,
               icon: const Icon(Icons.payments_outlined),
               label: const Text('Pay'),
@@ -589,8 +595,14 @@ class _DebtListItem extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: AppSpacing.md),
-              _MetaText(label: 'Total', value: formatEgpCurrency(debt.totalAmount)),
-              _MetaText(label: 'Paid', value: formatEgpCurrency(debt.paidAmount)),
+              _MetaText(
+                label: 'Total',
+                value: formatEgpCurrency(debt.totalAmount),
+              ),
+              _MetaText(
+                label: 'Paid',
+                value: formatEgpCurrency(debt.paidAmount),
+              ),
               _MetaText(
                 label: 'Remaining',
                 value: formatEgpCurrency(remainingAmount),
@@ -644,10 +656,7 @@ class _DebtMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: _DebtAction.edit,
-          child: Text('Edit'),
-        ),
+        const PopupMenuItem(value: _DebtAction.edit, child: Text('Edit')),
         if (canArchive)
           const PopupMenuItem(
             value: _DebtAction.archive,
@@ -687,10 +696,7 @@ class _DebtIcon extends StatelessWidget {
 }
 
 class _MetaText extends StatelessWidget {
-  const _MetaText({
-    required this.label,
-    required this.value,
-  });
+  const _MetaText({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -726,9 +732,9 @@ class _StatusBadge extends StatelessWidget {
         child: Text(
           status.label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: status.color,
-                fontWeight: FontWeight.w800,
-              ),
+            color: status.color,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -768,7 +774,9 @@ _DebtUiStatus _statusFor(
 
 bool _isOverdue(Debt debt, double remainingAmount) {
   final dueDate = debt.dueDate;
-  if (dueDate == null || debt.status != DebtStatus.active || remainingAmount <= 0) {
+  if (dueDate == null ||
+      debt.status != DebtStatus.active ||
+      remainingAmount <= 0) {
     return false;
   }
 

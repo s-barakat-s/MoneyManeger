@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../shared/models/owner.dart';
 import '../../domain/repositories/owner_repository.dart';
@@ -7,21 +6,16 @@ import '../../domain/repositories/owner_repository.dart';
 class FirestoreOwnerRepository implements OwnerRepository {
   const FirestoreOwnerRepository({
     required FirebaseFirestore firestore,
-    required FirebaseAuth auth,
+    required String uid,
   }) : _firestore = firestore,
-       _auth = auth;
+       _uid = uid;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final String _uid;
 
   @override
   Stream<List<Owner>> watchOwners() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _ownersCollection(userId)
+    return _ownersCollection(_uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map(
@@ -72,24 +66,18 @@ class FirestoreOwnerRepository implements OwnerRepository {
       'archivedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await _confirmDocumentExists(doc, 'Owner archive was not confirmed by Firestore.');
+    await _confirmDocumentExists(
+      doc,
+      'Owner archive was not confirmed by Firestore.',
+    );
   }
 
   CollectionReference<Map<String, dynamic>> _currentOwnersCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
-    return _ownersCollection(userId);
+    return _ownersCollection(_uid);
   }
 
   CollectionReference<Map<String, dynamic>> _ownersCollection(String userId) {
     return _firestore.collection('users').doc(userId).collection('owners');
-  }
-
-  String? _currentUserIdOrNull() {
-    return _auth.currentUser?.uid;
   }
 
   Owner _ownerFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {

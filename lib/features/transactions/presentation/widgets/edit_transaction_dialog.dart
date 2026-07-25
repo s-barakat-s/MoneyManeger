@@ -9,10 +9,7 @@ import '../../../owners/presentation/owner_stream_providers.dart';
 import '../../application/transaction_providers.dart';
 
 class EditTransactionDialog extends ConsumerStatefulWidget {
-  const EditTransactionDialog({
-    required this.transaction,
-    super.key,
-  });
+  const EditTransactionDialog({required this.transaction, super.key});
 
   final money.Transaction transaction;
 

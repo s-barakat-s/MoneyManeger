@@ -336,7 +336,9 @@ class AppTheme {
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
-            color: selected ? AppColors.primaryLight : AppColors.darkTextSecondary,
+            color: selected
+                ? AppColors.primaryLight
+                : AppColors.darkTextSecondary,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
           );
@@ -344,7 +346,9 @@ class AppTheme {
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            color: selected ? AppColors.primaryLight : AppColors.darkTextSecondary,
+            color: selected
+                ? AppColors.primaryLight
+                : AppColors.darkTextSecondary,
             size: 22,
           );
         }),

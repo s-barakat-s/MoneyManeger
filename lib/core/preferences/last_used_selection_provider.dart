@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/auth/application/auth_providers.dart';
+
 enum LastUsedOwnerSelection {
   debtPayment('last_debt_payment_owner_id'),
   receivableCollection('last_receivable_collection_owner_id'),
@@ -15,30 +17,36 @@ enum LastUsedOwnerSelection {
 }
 
 final lastUsedSelectionProvider = Provider<LastUsedSelectionStore>((ref) {
-  return const LastUsedSelectionStore();
+  final uid = ref.watch(authStateProvider).value?.uid;
+  return LastUsedSelectionStore(uid: uid);
 });
 
 class LastUsedSelectionStore {
-  const LastUsedSelectionStore();
+  const LastUsedSelectionStore({required this.uid});
+
+  final String? uid;
 
   Future<String?> read(LastUsedOwnerSelection selection) async {
+    if (uid == null) return null;
     try {
       final preferences = await SharedPreferences.getInstance();
-      return preferences.getString(selection.preferenceKey);
+      return preferences.getString(_key(selection));
     } catch (_) {
       return null;
     }
   }
 
-  Future<void> save(
-    LastUsedOwnerSelection selection,
-    String ownerId,
-  ) async {
+  Future<void> save(LastUsedOwnerSelection selection, String ownerId) async {
+    if (uid == null) return;
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setString(selection.preferenceKey, ownerId);
+      await preferences.setString(_key(selection), ownerId);
     } catch (_) {
       // The completed operation should not fail if local preferences do.
     }
+  }
+
+  String _key(LastUsedOwnerSelection selection) {
+    return 'user_${uid}_${selection.preferenceKey}';
   }
 }

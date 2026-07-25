@@ -3,14 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'company_asset.freezed.dart';
 part 'company_asset.g.dart';
 
-enum AssetCategory {
-  equipment,
-  electronics,
-  furniture,
-  vehicle,
-  office,
-  other,
-}
+enum AssetCategory { equipment, electronics, furniture, vehicle, office, other }
 
 @freezed
 abstract class CompanyAsset with _$CompanyAsset {

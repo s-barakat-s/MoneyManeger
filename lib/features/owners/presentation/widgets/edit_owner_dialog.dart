@@ -7,10 +7,7 @@ import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/owner_providers.dart';
 
 class EditOwnerDialog extends ConsumerStatefulWidget {
-  const EditOwnerDialog({
-    required this.owner,
-    super.key,
-  });
+  const EditOwnerDialog({required this.owner, super.key});
 
   final Owner owner;
 
@@ -50,7 +47,9 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
               TextFormField(
                 controller: _nameController,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Money Holder name'),
+                decoration: const InputDecoration(
+                  labelText: 'Money Holder name',
+                ),
                 textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -103,7 +102,9 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not save owner. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not save owner. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

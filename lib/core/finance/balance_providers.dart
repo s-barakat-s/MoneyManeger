@@ -31,12 +31,15 @@ final ownerBalancesProvider =
         transfers,
         (transactions, transfers) => ref
             .watch(balanceCalculatorProvider)
-            .calculateBalances(transactions: transactions, transfers: transfers),
+            .calculateBalances(
+              transactions: transactions,
+              transfers: transfers,
+            ),
       );
     });
 
-final ownerBalanceProvider =
-    Provider.autoDispose.family<AsyncValue<double>, String>((ref, ownerId) {
+final ownerBalanceProvider = Provider.autoDispose
+    .family<AsyncValue<double>, String>((ref, ownerId) {
       final balances = ref.watch(ownerBalancesProvider);
 
       return balances.whenData((value) => value[ownerId] ?? 0);

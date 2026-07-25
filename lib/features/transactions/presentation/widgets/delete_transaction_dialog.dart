@@ -5,10 +5,7 @@ import '../../../../shared/models/transaction.dart' as money;
 import '../../application/transaction_providers.dart';
 
 class DeleteTransactionDialog extends ConsumerStatefulWidget {
-  const DeleteTransactionDialog({
-    required this.transaction,
-    super.key,
-  });
+  const DeleteTransactionDialog({required this.transaction, super.key});
 
   final money.Transaction transaction;
 
@@ -68,7 +65,8 @@ class _DeleteTransactionDialogState
     } catch (_) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Could not archive transaction. Please try again.',
+          () => _errorMessage =
+              'Could not archive transaction. Please try again.',
         );
       }
     } finally {

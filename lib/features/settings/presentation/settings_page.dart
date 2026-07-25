@@ -15,13 +15,14 @@ import '../../../shared/widgets/app_shell.dart';
 import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../auth/application/saved_accounts_controller.dart';
+import '../../auth/application/unauthenticated_entry_controller.dart';
+import '../../auth/application/account_switch_controller.dart';
 import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/account_switcher_bottom_sheet.dart';
 
 class SettingsPage extends ConsumerWidget {
-  const SettingsPage({
-    required this.currentLocation,
-    super.key,
-  });
+  const SettingsPage({required this.currentLocation, super.key});
 
   final String currentLocation;
 
@@ -42,9 +43,7 @@ class SettingsPage extends ConsumerWidget {
           return _SettingsContent(user: user);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => _SettingsError(
-          message: error.toString(),
-        ),
+        error: (error, stackTrace) => _SettingsError(message: error.toString()),
       ),
     );
   }
@@ -66,114 +65,123 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
 
   @override
   Widget build(BuildContext context) {
-    final firestore = ref.watch(firebaseFirestoreProvider);
     final themeMode = ref.watch(themeModeProvider);
-    final profileStream = firestore
-        .collection('users')
-        .doc(widget.user.uid)
-        .snapshots();
+    final switchState = ref.watch(accountSwitchControllerProvider);
+    final isSwitching = switchState is AccountSwitchLoading;
+    final profile = ref.watch(userProfileProvider(widget.user.uid));
+    final name =
+        _profileValue(profile.value?.username) ??
+        _profileValue(widget.user.displayName) ??
+        'User';
+    final email = widget.user.email ?? 'Not set';
+    final currentUser = FirebaseAuth.instance.currentUser ?? widget.user;
+    final hasPassword = currentUser.providerData.any(
+      (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
+    );
 
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: profileStream,
-      builder: (context, snapshot) {
-        final profile = snapshot.data?.data() ?? {};
-        final name = _profileValue(profile['username']) ??
-            _profileValue(widget.user.displayName) ??
-            'User';
-        final email = widget.user.email ?? 'Not set';
-        final currentUser = FirebaseAuth.instance.currentUser ?? widget.user;
-        final hasPassword = currentUser.providerData.any(
-          (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
-        );
-
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: AppBottomNavSpacer.listPadding(context),
-            children: [
-            const PageHeader(
-              title: 'Settings',
-              subtitle: 'Manage your account and app preferences',
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _AccountCard(
-              name: name,
-              email: email,
-              onEdit: () => _showEditProfileDialog(context, name),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const _SectionTitle('Appearance'),
-            const SizedBox(height: AppSpacing.sm),
-            _SettingsCard(
-              child: _SettingsTile(
-                icon: Icons.dark_mode_rounded,
-                iconColor: AppColors.primary,
-                title: 'Appearance',
-                subtitle: _themeModeLabel(themeMode),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showThemeModeDialog(context, themeMode),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            const _SectionTitle('Account'),
-            const SizedBox(height: AppSpacing.sm),
-            _SettingsCard(
-              child: Column(
-                children: [
-                  _SettingsTile(
-                    icon: Icons.password_rounded,
-                    iconColor: AppColors.primary,
-                    title: hasPassword ? 'Change password' : 'Set password',
-                    subtitle: hasPassword
-                        ? 'Update your app account password.'
-                        : 'Create a password to sign in without Google.',
-                    trailing: _isSettingPassword
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.chevron_right_rounded),
-                    onTap: _isSettingPassword
-                        ? null
-                        : hasPassword
-                            ? _changePassword
-                            : _setPassword,
-                  ),
-                  const Divider(height: AppSpacing.xl),
-                  _SettingsTile(
-                    icon: Icons.logout_rounded,
-                    iconColor: AppColors.danger,
-                    title: 'Log out',
-                    subtitle: 'Sign out of this account',
-                    trailing: _isSigningOut
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.chevron_right_rounded),
-                    onTap: _isSigningOut ? null : _signOut,
-                  ),
-                ],
-              ),
-            ),
-            ],
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppBottomNavSpacer.listPadding(context),
+        children: [
+          const PageHeader(
+            title: 'Settings',
+            subtitle: 'Manage your account and app preferences',
           ),
-        );
-      },
+          const SizedBox(height: AppSpacing.xl),
+          _AccountCard(
+            name: name,
+            email: email,
+            photoUrl: widget.user.photoURL,
+            onEdit: () => _showEditProfileDialog(context, name),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('Appearance'),
+          const SizedBox(height: AppSpacing.sm),
+          _SettingsCard(
+            child: _SettingsTile(
+              icon: Icons.dark_mode_rounded,
+              iconColor: AppColors.primary,
+              title: 'Appearance',
+              subtitle: _themeModeLabel(themeMode),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showThemeModeDialog(context, themeMode),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('Account'),
+          const SizedBox(height: AppSpacing.sm),
+          _SettingsCard(
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.password_rounded,
+                  iconColor: AppColors.primary,
+                  title: hasPassword ? 'Change password' : 'Set password',
+                  subtitle: hasPassword
+                      ? 'Update your app account password.'
+                      : 'Create a password to sign in without Google.',
+                  trailing: _isSettingPassword
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _isSettingPassword
+                      ? null
+                      : hasPassword
+                      ? _changePassword
+                      : _setPassword,
+                ),
+                const Divider(height: AppSpacing.xl),
+                _SettingsTile(
+                  icon: Icons.switch_account_outlined,
+                  iconColor: AppColors.primary,
+                  title: 'Switch account',
+                  subtitle: 'Choose another Google account',
+                  trailing: isSwitching
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: isSwitching || _isSigningOut
+                      ? null
+                      : () => showAccountSwitcherBottomSheet(context),
+                ),
+                const Divider(height: AppSpacing.xl),
+                _SettingsTile(
+                  icon: Icons.logout_rounded,
+                  iconColor: AppColors.danger,
+                  title: 'Log out',
+                  subtitle: 'Sign out of this account',
+                  trailing: _isSigningOut
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _isSigningOut || isSwitching ? null : _signOut,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _showEditProfileDialog(
-    BuildContext context,
-    String username,
-  ) {
+  Future<void> _showEditProfileDialog(BuildContext context, String username) {
     final authService = ref.read(authServiceProvider);
     return showDialog<void>(
       context: context,
       builder: (context) => _EditProfileDialog(
         initialUsername: username == 'User' ? '' : username,
         authService: authService,
+        onUsernameChanged: (updatedUsername) => ref
+            .read(savedAccountsControllerProvider.notifier)
+            .updateUsername(widget.user.uid, updatedUsername),
       ),
     );
   }
@@ -250,7 +258,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     setState(() => _isSigningOut = true);
 
     try {
-      await ref.read(authServiceProvider).signOut();
+      await ref.read(unauthenticatedEntryControllerProvider.notifier).logout();
     } on FirebaseAuthException catch (error) {
       if (mounted) {
         _showMessage(_friendlyAuthError(error));
@@ -293,10 +301,8 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       final created = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => _SetPasswordDialog(
-          email: email,
-          authService: authService,
-        ),
+        builder: (context) =>
+            _SetPasswordDialog(email: email, authService: authService),
       );
       if (!mounted) return;
       if (created == true) {
@@ -341,10 +347,8 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     final changed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => _ChangePasswordDialog(
-        email: email,
-        authService: authService,
-      ),
+      builder: (context) =>
+          _ChangePasswordDialog(email: email, authService: authService),
     );
     if (!mounted) return;
     if (changed == true) {
@@ -353,9 +357,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String? _profileValue(Object? value) {
@@ -376,10 +380,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
 }
 
 class _SetPasswordDialog extends StatefulWidget {
-  const _SetPasswordDialog({
-    required this.email,
-    required this.authService,
-  });
+  const _SetPasswordDialog({required this.email, required this.authService});
 
   final String email;
   final AuthService authService;
@@ -428,9 +429,8 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
                 decoration: InputDecoration(
                   labelText: 'New password',
                   suffixIcon: IconButton(
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
-                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                     icon: Icon(
                       _obscurePassword
                           ? Icons.visibility_outlined
@@ -523,7 +523,9 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
         debugPrint('Password linking failed: ${error.runtimeType}.');
       }
       if (mounted) {
-        setState(() => _message = 'Could not create password. Please try again.');
+        setState(
+          () => _message = 'Could not create password. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -538,10 +540,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
 }
 
 class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog({
-    required this.email,
-    required this.authService,
-  });
+  const _ChangePasswordDialog({required this.email, required this.authService});
 
   final String email;
   final AuthService authService;
@@ -591,8 +590,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                     labelText: 'Current password',
                     suffixIcon: IconButton(
                       onPressed: () => setState(
-                        () => _obscureCurrentPassword =
-                            !_obscureCurrentPassword,
+                        () =>
+                            _obscureCurrentPassword = !_obscureCurrentPassword,
                       ),
                       icon: Icon(
                         _obscureCurrentPassword
@@ -726,7 +725,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         debugPrint('Password change failed: ${error.runtimeType}.');
       }
       if (mounted) {
-        setState(() => _message = 'Could not change password. Please try again.');
+        setState(
+          () => _message = 'Could not change password. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -779,26 +780,26 @@ String _passwordLinkError(FirebaseAuthException error) {
       'Please verify your Google account again and retry.',
     'weak-password' => 'Use a stronger password with at least 8 characters.',
     'invalid-email' => 'The Google account email is invalid.',
-    'operation-not-allowed' =>
-      'Email and password sign-in is not enabled.',
+    'operation-not-allowed' => 'Email and password sign-in is not enabled.',
     'network-request-failed' =>
       'Network error. Check your connection and try again.',
     'too-many-requests' => 'Too many attempts. Please wait and try again.',
     'user-mismatch' => 'Google verification used a different account.',
     'user-disabled' => 'This account has been disabled.',
     'user-not-found' => 'This account is no longer available.',
-    'invalid-user-token' || 'user-token-expired' =>
-      'Your session expired. Please sign in again.',
-    'popup-closed-by-user' || 'cancelled-popup-request' || 'canceled' =>
-      'Google re-authentication was cancelled.',
+    'invalid-user-token' ||
+    'user-token-expired' => 'Your session expired. Please sign in again.',
+    'popup-closed-by-user' ||
+    'cancelled-popup-request' ||
+    'canceled' => 'Google re-authentication was cancelled.',
     _ => 'Authentication failed. Please try again.',
   };
 }
 
 String _passwordChangeError(FirebaseAuthException error) {
   return switch (error.code) {
-    'wrong-password' || 'invalid-credential' =>
-      'The current password is incorrect.',
+    'wrong-password' ||
+    'invalid-credential' => 'The current password is incorrect.',
     'weak-password' => 'Use a stronger password with at least 8 characters.',
     'requires-recent-login' =>
       'Please sign in again before changing your password.',
@@ -807,10 +808,9 @@ String _passwordChangeError(FirebaseAuthException error) {
     'too-many-requests' => 'Too many attempts. Please wait and try again.',
     'user-disabled' => 'This account has been disabled.',
     'user-not-found' => 'This account is no longer available.',
-    'operation-not-allowed' =>
-      'Email and password sign-in is not enabled.',
-    'invalid-user-token' || 'user-token-expired' =>
-      'Your session expired. Please sign in again.',
+    'operation-not-allowed' => 'Email and password sign-in is not enabled.',
+    'invalid-user-token' ||
+    'user-token-expired' => 'Your session expired. Please sign in again.',
     'provider-already-linked' => 'A password is already configured.',
     'credential-already-in-use' =>
       'These credentials are already used by another account.',
@@ -823,10 +823,9 @@ String _passwordResetError(FirebaseAuthException error) {
     'network-request-failed' =>
       'Network error. Check your connection and try again.',
     'too-many-requests' => 'Too many requests. Please wait and try again.',
-    'operation-not-allowed' =>
-      'Password reset is not currently available.',
-    'invalid-user-token' || 'user-token-expired' =>
-      'Your session expired. Please sign in again.',
+    'operation-not-allowed' => 'Password reset is not currently available.',
+    'invalid-user-token' ||
+    'user-token-expired' => 'Your session expired. Please sign in again.',
     _ => 'Could not send the reset link. Try again.',
   };
 }
@@ -835,11 +834,13 @@ class _AccountCard extends StatelessWidget {
   const _AccountCard({
     required this.name,
     required this.email,
+    required this.photoUrl,
     required this.onEdit,
   });
 
   final String name;
   final String email;
+  final String? photoUrl;
   final VoidCallback onEdit;
 
   @override
@@ -849,15 +850,17 @@ class _AccountCard extends StatelessWidget {
     return _SettingsCard(
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
-              ),
+          ClipOval(
+            child: SizedBox.square(
+              dimension: 56,
+              child: photoUrl == null || photoUrl!.trim().isEmpty
+                  ? _AccountInitial(initial: initial)
+                  : Image.network(
+                      photoUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          _AccountInitial(initial: initial),
+                    ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -870,8 +873,8 @@ class _AccountCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -879,17 +882,14 @@ class _AccountCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: _mutedTextColor(context),
-                      ),
+                    color: _mutedTextColor(context),
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          TextButton(
-            onPressed: onEdit,
-            child: const Text('Edit'),
-          ),
+          TextButton(onPressed: onEdit, child: const Text('Edit')),
         ],
       ),
     );
@@ -902,14 +902,38 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
+class _AccountInitial extends StatelessWidget {
+  const _AccountInitial({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EditProfileDialog extends StatefulWidget {
   const _EditProfileDialog({
     required this.initialUsername,
     required this.authService,
+    required this.onUsernameChanged,
   });
 
   final String initialUsername;
   final AuthService authService;
+  final Future<void> Function(String username) onUsernameChanged;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -963,9 +987,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   _message!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ],
             ],
@@ -993,8 +1015,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Future<void> _save() async {
     if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
-    final normalizedUsername =
-        _usernameController.text.trim().toLowerCase();
+    final normalizedUsername = _usernameController.text.trim().toLowerCase();
     if (normalizedUsername == widget.initialUsername.trim().toLowerCase()) {
       Navigator.of(context).pop();
       return;
@@ -1008,6 +1029,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     });
     try {
       await authService.changeCurrentUsername(normalizedUsername);
+      await widget.onUsernameChanged(normalizedUsername);
       if (mounted) {
         Navigator.of(context).pop();
         messenger.showSnackBar(
@@ -1028,12 +1050,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               'Username update was denied. Please try again.',
             'unavailable' || 'network-request-failed' =>
               'Could not connect. Check your connection and try again.',
-            'aborted' =>
-              'Username update was interrupted. Please try again.',
-            'deadline-exceeded' =>
-              'The request timed out. Please try again.',
-            'unauthenticated' =>
-              'Your session expired. Please sign in again.',
+            'aborted' => 'Username update was interrupted. Please try again.',
+            'deadline-exceeded' => 'The request timed out. Please try again.',
+            'unauthenticated' => 'Your session expired. Please sign in again.',
             _ => 'Could not update username. Please try again.',
           },
         );
@@ -1076,9 +1095,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 }
@@ -1096,9 +1115,7 @@ class _SettingsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: AppRadius.borderXl,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
         boxShadow: isDark ? const [] : AppShadows.soft,
       ),
       child: Padding(
@@ -1148,16 +1165,16 @@ class _SettingsTile extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _mutedTextColor(context),
-                    ),
+                  color: _mutedTextColor(context),
+                ),
               ),
             ],
           ),
@@ -1208,7 +1225,7 @@ Color _mutedTextColor(BuildContext context) {
 }
 
 String _themeModeLabel(ThemeMode mode) => switch (mode) {
-      ThemeMode.system => 'System default',
-      ThemeMode.light => 'Light',
-      ThemeMode.dark => 'Dark',
-    };
+  ThemeMode.system => 'System default',
+  ThemeMode.light => 'Light',
+  ThemeMode.dark => 'Dark',
+};

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../shared/models/transaction.dart' as money;
 import '../../domain/repositories/transaction_repository.dart';
@@ -7,21 +6,16 @@ import '../../domain/repositories/transaction_repository.dart';
 class FirestoreTransactionRepository implements TransactionRepository {
   const FirestoreTransactionRepository({
     required FirebaseFirestore firestore,
-    required FirebaseAuth auth,
+    required String uid,
   }) : _firestore = firestore,
-       _auth = auth;
+       _uid = uid;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final String _uid;
 
   @override
   Stream<List<money.Transaction>> watchTransactions() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _transactionsCollection(userId)
+    return _transactionsCollection(_uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map(
@@ -34,12 +28,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
 
   @override
   Stream<List<money.Transaction>> watchTransactionsByOwner(String ownerId) {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _transactionsCollection(userId)
+    return _transactionsCollection(_uid)
         .where('ownerId', isEqualTo: ownerId)
         .orderBy('date', descending: true)
         .snapshots()
@@ -107,12 +96,7 @@ class FirestoreTransactionRepository implements TransactionRepository {
   }
 
   CollectionReference<Map<String, dynamic>> _currentTransactionsCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
-    return _transactionsCollection(userId);
+    return _transactionsCollection(_uid);
   }
 
   CollectionReference<Map<String, dynamic>> _transactionsCollection(
@@ -122,10 +106,6 @@ class FirestoreTransactionRepository implements TransactionRepository {
         .collection('users')
         .doc(userId)
         .collection('transactions');
-  }
-
-  String? _currentUserIdOrNull() {
-    return _auth.currentUser?.uid;
   }
 
   money.Transaction _transactionFromDoc(

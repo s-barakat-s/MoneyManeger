@@ -224,14 +224,12 @@ class _TransferFilterSheetState extends State<_TransferFilterSheet> {
   @override
   void initState() {
     super.initState();
-    _fromOwnerId = widget.owners.any(
-      (owner) => owner.id == widget.selectedFromOwnerId,
-    )
+    _fromOwnerId =
+        widget.owners.any((owner) => owner.id == widget.selectedFromOwnerId)
         ? widget.selectedFromOwnerId
         : null;
-    _toOwnerId = widget.owners.any(
-      (owner) => owner.id == widget.selectedToOwnerId,
-    )
+    _toOwnerId =
+        widget.owners.any((owner) => owner.id == widget.selectedToOwnerId)
         ? widget.selectedToOwnerId
         : null;
   }
@@ -292,10 +290,7 @@ class _MoneyHolderFilterDropdown extends StatelessWidget {
         for (final owner in owners)
           DropdownMenuItem<String?>(
             value: owner.id,
-            child: Text(
-              owner.name,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(owner.name, overflow: TextOverflow.ellipsis),
           ),
       ],
       onChanged: onChanged,
@@ -322,16 +317,16 @@ class _TransfersList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ownerNames = {
-      for (final owner in owners) owner.id: owner.name,
-    };
+    final ownerNames = {for (final owner in owners) owner.id: owner.name};
     final effectiveFromOwnerId = ownerNames.containsKey(selectedFromOwnerId)
         ? selectedFromOwnerId
         : null;
-    final effectiveToOwnerId =
-        ownerNames.containsKey(selectedToOwnerId) ? selectedToOwnerId : null;
+    final effectiveToOwnerId = ownerNames.containsKey(selectedToOwnerId)
+        ? selectedToOwnerId
+        : null;
     final normalizedSearch = searchText.trim().toLowerCase();
-    final hasActiveFilters = normalizedSearch.isNotEmpty ||
+    final hasActiveFilters =
+        normalizedSearch.isNotEmpty ||
         effectiveFromOwnerId != null ||
         effectiveToOwnerId != null;
     final visibleTransfers = transfers.where((transfer) {
@@ -339,15 +334,18 @@ class _TransfersList extends StatelessWidget {
       final toOwner = ownerNames[transfer.toOwnerId] ?? '';
       final note = transfer.note?.trim() ?? '';
       final amount = formatEgpCurrency(transfer.amount);
-      final matchesSearch = normalizedSearch.isEmpty ||
+      final matchesSearch =
+          normalizedSearch.isEmpty ||
           fromOwner.toLowerCase().contains(normalizedSearch) ||
           toOwner.toLowerCase().contains(normalizedSearch) ||
           note.toLowerCase().contains(normalizedSearch) ||
           amount.toLowerCase().contains(normalizedSearch);
-      final matchesFrom = effectiveFromOwnerId == null ||
+      final matchesFrom =
+          effectiveFromOwnerId == null ||
           transfer.fromOwnerId == effectiveFromOwnerId;
       final matchesTo =
-          effectiveToOwnerId == null || transfer.toOwnerId == effectiveToOwnerId;
+          effectiveToOwnerId == null ||
+          transfer.toOwnerId == effectiveToOwnerId;
 
       return matchesSearch && matchesFrom && matchesTo;
     }).toList();
@@ -378,7 +376,8 @@ class _TransfersList extends StatelessWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleTransfers.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         final transfer = visibleTransfers[index];
         final fromOwner = ownerNames[transfer.fromOwnerId] ?? 'Unknown owner';
@@ -472,21 +471,14 @@ class _TransferIcon extends StatelessWidget {
       child: const SizedBox(
         width: 46,
         height: 46,
-        child: Icon(
-          Icons.swap_horiz_rounded,
-          color: AppColors.info,
-          size: 24,
-        ),
+        child: Icon(Icons.swap_horiz_rounded, color: AppColors.info, size: 24),
       ),
     );
   }
 }
 
 class _TransferDirection extends StatelessWidget {
-  const _TransferDirection({
-    required this.fromOwner,
-    required this.toOwner,
-  });
+  const _TransferDirection({required this.fromOwner, required this.toOwner});
 
   final String fromOwner;
   final String toOwner;

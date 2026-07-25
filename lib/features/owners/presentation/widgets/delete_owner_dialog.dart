@@ -5,10 +5,7 @@ import '../../../../shared/models/owner.dart';
 import '../../application/owner_providers.dart';
 
 class DeleteOwnerDialog extends ConsumerStatefulWidget {
-  const DeleteOwnerDialog({
-    required this.owner,
-    super.key,
-  });
+  const DeleteOwnerDialog({required this.owner, super.key});
 
   final Owner owner;
 
@@ -65,7 +62,9 @@ class _DeleteOwnerDialogState extends ConsumerState<DeleteOwnerDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not archive owner. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not archive owner. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

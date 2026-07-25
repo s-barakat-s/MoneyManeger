@@ -15,27 +15,26 @@ final weOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((ref) {
     (value) => value
         .where(
           (debt) =>
-              debt.type == DebtType.weOwe &&
-              debt.status == DebtStatus.active,
+              debt.type == DebtType.weOwe && debt.status == DebtStatus.active,
         )
         .toList(),
   );
 });
 
-final archivedWeOweDebtsProvider =
-    Provider.autoDispose<AsyncValue<List<Debt>>>((ref) {
-      final debts = ref.watch(debtsStreamProvider);
+final archivedWeOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>(
+  (ref) {
+    final debts = ref.watch(debtsStreamProvider);
 
-      return debts.whenData(
-        (value) => value
-            .where(
-              (debt) =>
-                  debt.type == DebtType.weOwe &&
-                  debt.status != DebtStatus.active,
-            )
-            .toList(),
-      );
-    });
+    return debts.whenData(
+      (value) => value
+          .where(
+            (debt) =>
+                debt.type == DebtType.weOwe && debt.status != DebtStatus.active,
+          )
+          .toList(),
+    );
+  },
+);
 
 final owedToUsDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((
   ref,
@@ -68,13 +67,13 @@ final archivedOwedToUsDebtsProvider =
       );
     });
 
-final debtPaymentsStreamProvider =
-    StreamProvider.autoDispose.family<List<DebtPayment>, String>((ref, debtId) {
+final debtPaymentsStreamProvider = StreamProvider.autoDispose
+    .family<List<DebtPayment>, String>((ref, debtId) {
       return ref.watch(debtRepositoryProvider).watchPayments(debtId);
     });
 
-final debtPaidAmountProvider =
-    Provider.autoDispose.family<AsyncValue<double>, String>((ref, debtId) {
+final debtPaidAmountProvider = Provider.autoDispose
+    .family<AsyncValue<double>, String>((ref, debtId) {
       final payments = ref.watch(debtPaymentsStreamProvider(debtId));
 
       return payments.whenData(
@@ -82,25 +81,25 @@ final debtPaidAmountProvider =
       );
     });
 
-final debtRemainingAmountProvider =
-    Provider.autoDispose.family<AsyncValue<double>, Debt>((ref, debt) {
+final debtRemainingAmountProvider = Provider.autoDispose
+    .family<AsyncValue<double>, Debt>((ref, debt) {
       final paid = ref.watch(debtPaidAmountProvider(debt.id));
 
-      return paid.whenData(
-        (value) {
-          final paidAmount = debt.paidAmount > value ? debt.paidAmount : value;
-          return (debt.totalAmount - paidAmount)
-              .clamp(0, double.infinity)
-              .toDouble();
-        },
-      );
+      return paid.whenData((value) {
+        final paidAmount = debt.paidAmount > value ? debt.paidAmount : value;
+        return (debt.totalAmount - paidAmount)
+            .clamp(0, double.infinity)
+            .toDouble();
+      });
     });
 
 final collectedAmountProvider = debtPaidAmountProvider;
 
 final remainingToCollectProvider = debtRemainingAmountProvider;
 
-final debtSummaryProvider = Provider.autoDispose<AsyncValue<DebtSummary>>((ref) {
+final debtSummaryProvider = Provider.autoDispose<AsyncValue<DebtSummary>>((
+  ref,
+) {
   final debts = ref.watch(weOweDebtsProvider);
 
   return _buildDebtSummary(debts);
@@ -113,9 +112,7 @@ final owedToUsDebtSummaryProvider =
       return _buildDebtSummary(debts);
     });
 
-AsyncValue<DebtSummary> _buildDebtSummary(
-  AsyncValue<List<Debt>> debts,
-) {
+AsyncValue<DebtSummary> _buildDebtSummary(AsyncValue<List<Debt>> debts) {
   return debts.when(
     data: (value) {
       final totalDebts = value.fold(

@@ -4,10 +4,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 
 class LoadingSkeleton extends StatelessWidget {
-  const LoadingSkeleton({
-    this.itemCount = 3,
-    super.key,
-  });
+  const LoadingSkeleton({this.itemCount = 3, super.key});
 
   final int itemCount;
 

@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppButtonVariant {
-  filled,
-  outlined,
-  text,
-}
+enum AppButtonVariant { filled, outlined, text }
 
 class AppButton extends StatelessWidget {
   const AppButton({
@@ -23,27 +19,30 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (variant) {
-      AppButtonVariant.filled => icon == null
-          ? FilledButton(onPressed: onPressed, child: Text(label))
-          : FilledButton.icon(
-              onPressed: onPressed,
-              icon: Icon(icon),
-              label: Text(label),
-            ),
-      AppButtonVariant.outlined => icon == null
-          ? OutlinedButton(onPressed: onPressed, child: Text(label))
-          : OutlinedButton.icon(
-              onPressed: onPressed,
-              icon: Icon(icon),
-              label: Text(label),
-            ),
-      AppButtonVariant.text => icon == null
-          ? TextButton(onPressed: onPressed, child: Text(label))
-          : TextButton.icon(
-              onPressed: onPressed,
-              icon: Icon(icon),
-              label: Text(label),
-            ),
+      AppButtonVariant.filled =>
+        icon == null
+            ? FilledButton(onPressed: onPressed, child: Text(label))
+            : FilledButton.icon(
+                onPressed: onPressed,
+                icon: Icon(icon),
+                label: Text(label),
+              ),
+      AppButtonVariant.outlined =>
+        icon == null
+            ? OutlinedButton(onPressed: onPressed, child: Text(label))
+            : OutlinedButton.icon(
+                onPressed: onPressed,
+                icon: Icon(icon),
+                label: Text(label),
+              ),
+      AppButtonVariant.text =>
+        icon == null
+            ? TextButton(onPressed: onPressed, child: Text(label))
+            : TextButton.icon(
+                onPressed: onPressed,
+                icon: Icon(icon),
+                label: Text(label),
+              ),
     };
   }
 }
@@ -62,11 +61,7 @@ class AppPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppButton(
-      label: label,
-      onPressed: onPressed,
-      icon: icon,
-    );
+    return AppButton(label: label, onPressed: onPressed, icon: icon);
   }
 }
 

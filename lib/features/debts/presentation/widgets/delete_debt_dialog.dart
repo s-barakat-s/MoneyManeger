@@ -30,7 +30,8 @@ class _DeleteDebtDialogState extends ConsumerState<DeleteDebtDialog> {
 
     return AlertDialog(
       title: Text(
-        widget.title ?? (isReceivable ? 'Archive receivable?' : 'Archive debt?'),
+        widget.title ??
+            (isReceivable ? 'Archive receivable?' : 'Archive debt?'),
       ),
       content: Text(
         isReceivable

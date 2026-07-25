@@ -11,10 +11,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../application/auth_providers.dart';
+import '../application/unauthenticated_entry_controller.dart';
 import '../data/auth_service.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
-  const AuthPage({super.key});
+  const AuthPage({this.onBackToSavedAccounts, super.key});
+
+  final VoidCallback? onBackToSavedAccounts;
 
   @override
   ConsumerState<AuthPage> createState() => _AuthPageState();
@@ -39,101 +42,122 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    return _AuthScaffold(
-      cardTitle: 'Welcome back',
-      cardSubtitle: 'Sign in to continue managing your business.',
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 260),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: _showSuccess
-            ? const _AuthSuccessState(
-                key: ValueKey('login-success'),
-                title: 'Welcome back!',
-                subtitle: 'Login successful',
-              )
-            : Form(
-        key: _formKey,
-        child: AutofillGroup(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _emailController,
-                autofocus: true,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'you@company.com',
-                  prefixIcon: Icon(Icons.alternate_email_rounded),
-                ),
-                validator: _validateEmail,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.password],
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: _PasswordVisibilityButton(
-                    obscureText: _obscurePassword,
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
+    final returnToSavedAccounts = widget.onBackToSavedAccounts;
+    return PopScope(
+      canPop: returnToSavedAccounts == null,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) returnToSavedAccounts?.call();
+      },
+      child: _AuthScaffold(
+        cardTitle: 'Welcome back',
+        cardSubtitle: 'Sign in to continue managing your business.',
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: _showSuccess
+              ? const _AuthSuccessState(
+                  key: ValueKey('login-success'),
+                  title: 'Welcome back!',
+                  subtitle: 'Login successful',
+                )
+              : Form(
+                  key: _formKey,
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _emailController,
+                          autofocus: true,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [AutofillHints.email],
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            hintText: 'you@company.com',
+                            prefixIcon: Icon(Icons.alternate_email_rounded),
+                          ),
+                          validator: _validateEmail,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.password],
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            hintText: 'Enter your password',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                            suffixIcon: _PasswordVisibilityButton(
+                              obscureText: _obscurePassword,
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                            ),
+                          ),
+                          validator: _validatePassword,
+                          onFieldSubmitted: (_) {
+                            if (!_isSubmitting) _login();
+                          },
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : _openPasswordReset,
+                            child: const Text('Forgot password?'),
+                          ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: _message == null
+                              ? const SizedBox.shrink()
+                              : Padding(
+                                  key: ValueKey(_message),
+                                  padding: const EdgeInsets.only(
+                                    top: AppSpacing.md,
+                                  ),
+                                  child: _AuthMessage(message: _message!),
+                                ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        _GradientAuthButton(
+                          label: 'Sign in',
+                          icon: Icons.arrow_forward_rounded,
+                          isLoading: _isSubmitting,
+                          onPressed: _isSubmitting ? null : _login,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        const _OrDivider(),
+                        const SizedBox(height: AppSpacing.lg),
+                        _GoogleAuthButton(
+                          isLoading: _isSubmitting,
+                          onPressed: _isSubmitting ? null : _googleSignIn,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        _AuthSwitchAction(
+                          prompt: 'New to Money Manager?',
+                          action: 'Create account',
+                          onPressed: _isSubmitting ? null : _openRegisterPage,
+                        ),
+                        if (widget.onBackToSavedAccounts != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          TextButton.icon(
+                            onPressed: _isSubmitting
+                                ? null
+                                : widget.onBackToSavedAccounts,
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            label: const Text('Back to saved accounts'),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-                validator: _validatePassword,
-                onFieldSubmitted: (_) {
-                  if (!_isSubmitting) _login();
-                },
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isSubmitting ? null : _openPasswordReset,
-                  child: const Text('Forgot password?'),
-                ),
-              ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: _message == null
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        key: ValueKey(_message),
-                        padding: const EdgeInsets.only(top: AppSpacing.md),
-                        child: _AuthMessage(message: _message!),
-                      ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _GradientAuthButton(
-                label: 'Sign in',
-                icon: Icons.arrow_forward_rounded,
-                isLoading: _isSubmitting,
-                onPressed: _isSubmitting ? null : _login,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const _OrDivider(),
-              const SizedBox(height: AppSpacing.lg),
-              _GoogleAuthButton(
-                isLoading: _isSubmitting,
-                onPressed: _isSubmitting ? null : _googleSignIn,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _AuthSwitchAction(
-                prompt: 'New to Money Manager?',
-                action: 'Create account',
-                onPressed: _isSubmitting ? null : _openRegisterPage,
-              ),
-            ],
-          ),
         ),
-            ),
       ),
     );
   }
@@ -148,7 +172,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       _message = null;
     });
     try {
-      await ref.read(authServiceProvider).signInWithEmailPassword(
+      await ref
+          .read(authServiceProvider)
+          .signInWithEmailPassword(
             email: _emailController.text,
             password: _passwordController.text,
           );
@@ -206,16 +232,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   String _friendlyLoginAuthError(FirebaseAuthException error) {
     return switch (error.code) {
-      'invalid-credential' || 'user-not-found' || 'wrong-password' =>
-        'Incorrect email or password.',
+      'invalid-credential' ||
+      'user-not-found' ||
+      'wrong-password' => 'Incorrect email or password.',
       'invalid-email' => 'Enter a valid email address.',
       'user-disabled' => 'This account has been disabled.',
       'network-request-failed' =>
         'Network error. Check your connection and try again.',
       'too-many-requests' =>
         'Too many attempts. Please wait a moment and try again.',
-      'operation-not-allowed' =>
-        'Email and password sign-in is not enabled.',
+      'operation-not-allowed' => 'Email and password sign-in is not enabled.',
       _ => 'Authentication failed. Please try again.',
     };
   }
@@ -312,9 +338,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: _PasswordVisibilityButton(
                     obscureText: _obscurePassword,
-                    onPressed: () => setState(
-                      () => _obscurePassword = !_obscurePassword,
-                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
                 validator: _validateRegistrationPassword,
@@ -389,19 +414,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _isSubmitting = true;
       _message = null;
     });
-    final registrationFlow =
-        ref.read(registrationInProgressProvider.notifier);
-    final verificationEmail =
-        ref.read(verificationEmailStateProvider.notifier);
+    final registrationFlow = ref.read(registrationInProgressProvider.notifier);
+    final verificationEmail = ref.read(verificationEmailStateProvider.notifier);
     verificationEmail.reset();
     registrationFlow.begin();
     try {
       final authService = ref.read(authServiceProvider);
-      final credential =
-          await authService.registerWithEmailPassword(
-            email: _emailController.text,
-            password: _passwordController.text,
-          );
+      final credential = await authService.registerWithEmailPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
       final user = credential.user;
       if (user == null) throw const NoAuthenticatedUserException();
       try {
@@ -439,7 +461,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _message = 'Could not create account. Please try again.');
+        setState(
+          () => _message = 'Could not create account. Please try again.',
+        );
       }
     } finally {
       if (mounted) {
@@ -621,8 +645,7 @@ class _PasswordResetDialogState extends State<_PasswordResetDialog> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _message =
-              'Could not send the reset link. Please try again.',
+          () => _message = 'Could not send the reset link. Please try again.',
         );
       }
     } finally {
@@ -653,8 +676,7 @@ class _PasswordResetDialogState extends State<_PasswordResetDialog> {
         'Too many requests were made. Please wait before trying again.',
       'network-request-failed' =>
         'Could not connect. Check your internet connection and try again.',
-      'operation-not-allowed' =>
-        'Password reset is not currently available.',
+      'operation-not-allowed' => 'Password reset is not currently available.',
       'user-disabled' =>
         'Password reset could not be completed. Please try again later.',
       'internal-error' =>
@@ -667,10 +689,7 @@ class _PasswordResetDialogState extends State<_PasswordResetDialog> {
 enum _RecoveryAction { backToLogin }
 
 class _EmailRecoveryDialog extends StatefulWidget {
-  const _EmailRecoveryDialog({
-    required this.email,
-    required this.authService,
-  });
+  const _EmailRecoveryDialog({required this.email, required this.authService});
 
   final String email;
   final AuthService authService;
@@ -708,9 +727,7 @@ class _EmailRecoveryDialogState extends State<_EmailRecoveryDialog> {
         TextButton(
           onPressed: _isSending
               ? null
-              : () => Navigator.of(context).pop(
-                    _RecoveryAction.backToLogin,
-                  ),
+              : () => Navigator.of(context).pop(_RecoveryAction.backToLogin),
           child: const Text('Back to login'),
         ),
         FilledButton(
@@ -784,8 +801,7 @@ class EmailVerificationPage extends ConsumerStatefulWidget {
       _EmailVerificationPageState();
 }
 
-class _EmailVerificationPageState
-    extends ConsumerState<EmailVerificationPage> {
+class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   Timer? _cooldownTimer;
   int _cooldownSeconds = 0;
   bool _isChecking = false;
@@ -824,9 +840,9 @@ class _EmailVerificationPageState
           Text(
             email == null || email.isEmpty ? 'Email unavailable' : email,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -834,8 +850,8 @@ class _EmailVerificationPageState
             'The email may take a few minutes to arrive.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           if (_message != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -909,8 +925,7 @@ class _EmailVerificationPageState
   Future<void> _resend() async {
     if (_isBusy || _cooldownSeconds > 0) return;
     final authService = ref.read(authServiceProvider);
-    final verificationEmail =
-        ref.read(verificationEmailStateProvider.notifier);
+    final verificationEmail = ref.read(verificationEmailStateProvider.notifier);
     setState(() {
       _isResending = true;
       _message = null;
@@ -942,11 +957,10 @@ class _EmailVerificationPageState
 
   Future<void> _signOut() async {
     if (_isBusy) return;
-    final authService = ref.read(authServiceProvider);
     ref.read(verificationEmailStateProvider.notifier).reset();
     setState(() => _isSigningOut = true);
     try {
-      await authService.signOut();
+      await ref.read(unauthenticatedEntryControllerProvider.notifier).logout();
     } on FirebaseAuthException catch (error) {
       _debugVerificationError('Verification sign-out', error);
       if (mounted) setState(() => _message = _verificationError(error));
@@ -985,8 +999,8 @@ class _EmailVerificationPageState
       'user-not-found' => 'This account is no longer available.',
       'requires-recent-login' => 'Please sign in again and retry.',
       'unauthenticated' => 'Your session expired. Please sign in again.',
-      'invalid-user-token' || 'user-token-expired' =>
-        'Your session expired. Please sign in again.',
+      'invalid-user-token' ||
+      'user-token-expired' => 'Your session expired. Please sign in again.',
       _ => 'Authentication request failed. Please try again.',
     };
   }
@@ -1108,9 +1122,9 @@ class _UsernameOnboardingPageState
 
     try {
       await authService.completeUserProfile(
-            user: widget.user,
-            username: _usernameController.text,
-          );
+        user: widget.user,
+        username: _usernameController.text,
+      );
       // The live profile stream refreshes AuthGate without touching ref after
       // this widget may already have been disposed.
     } on UsernameAlreadyTakenException {
@@ -1126,12 +1140,9 @@ class _UsernameOnboardingPageState
           () => _message = switch (error.code) {
             'permission-denied' =>
               'Profile setup was denied. Please try again or log out.',
-            'unavailable' ||
-            'network-request-failed' ||
-            'deadline-exceeded' =>
+            'unavailable' || 'network-request-failed' || 'deadline-exceeded' =>
               'Profile setup could not reach the server. Please try again.',
-            'aborted' =>
-              'Username setup was interrupted. Please try again.',
+            'aborted' => 'Username setup was interrupted. Please try again.',
             _ => 'Profile setup failed. Please try again.',
           },
         );
@@ -1148,14 +1159,11 @@ class _UsernameOnboardingPageState
   Future<void> _logout() async {
     setState(() => _isSubmitting = true);
     if (kDebugMode) debugPrint('Onboarding sign-out started.');
-    final authService = ref.read(authServiceProvider);
     try {
-      await authService.signOut();
+      await ref.read(unauthenticatedEntryControllerProvider.notifier).logout();
     } catch (_) {
       if (mounted) {
-        setState(
-          () => _message = 'Could not sign out. Please try again.',
-        );
+        setState(() => _message = 'Could not sign out. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -1189,15 +1197,16 @@ class ProfileLoadErrorPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           FilledButton.icon(
-            onPressed: () => ref.invalidate(
-              userProfileStatusProvider(user.uid),
-            ),
+            onPressed: () =>
+                ref.invalidate(userProfileStatusProvider(user.uid)),
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Try again'),
           ),
           const SizedBox(height: AppSpacing.md),
           TextButton.icon(
-            onPressed: () => ref.read(authServiceProvider).signOut(),
+            onPressed: () => ref
+                .read(unauthenticatedEntryControllerProvider.notifier)
+                .logout(),
             icon: const Icon(Icons.logout_rounded),
             label: const Text('Log out'),
           ),
@@ -1294,7 +1303,9 @@ class _AuthScaffold extends StatelessWidget {
                             )
                           else
                             const SizedBox(height: 48),
-                          SizedBox(height: compact ? AppSpacing.sm : AppSpacing.md),
+                          SizedBox(
+                            height: compact ? AppSpacing.sm : AppSpacing.md,
+                          ),
                           const _AuthBrandHeader(),
                           SizedBox(height: compact ? AppSpacing.xl : 36),
                           _AuthEntrance(
@@ -1308,7 +1319,8 @@ class _AuthScaffold extends StatelessWidget {
                           Text(
                             'Secure • Private • Built for your business',
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1369,19 +1381,19 @@ class _AuthBrandHeader extends StatelessWidget {
           'Money Manager',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.8,
-              ),
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.8,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Manage your business finances\nwith confidence.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.45,
-              ),
+            color: colorScheme.onSurfaceVariant,
+            height: 1.45,
+          ),
         ),
       ],
     );
@@ -1431,17 +1443,17 @@ class _AuthCard extends StatelessWidget {
             Text(
               title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.4,
-                  ),
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.4,
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               subtitle,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: AppSpacing.xl),
             child,
@@ -1523,7 +1535,9 @@ class _PasswordVisibilityButton extends StatelessWidget {
       icon: AnimatedSwitcher(
         duration: const Duration(milliseconds: 160),
         child: Icon(
-          obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          obscureText
+              ? Icons.visibility_outlined
+              : Icons.visibility_off_outlined,
           key: ValueKey(obscureText),
         ),
       ),
@@ -1588,8 +1602,12 @@ class _GradientAuthButtonState extends State<_GradientAuthButton> {
             borderRadius: BorderRadius.circular(999),
             child: InkWell(
               onTap: widget.onPressed,
-              onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
-              onTapCancel: enabled ? () => setState(() => _pressed = false) : null,
+              onTapDown: enabled
+                  ? (_) => setState(() => _pressed = true)
+                  : null,
+              onTapCancel: enabled
+                  ? () => setState(() => _pressed = false)
+                  : null,
               onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
               borderRadius: BorderRadius.circular(999),
               child: SizedBox(
@@ -1653,13 +1671,10 @@ class _AuthSwitchAction extends StatelessWidget {
         Text(
           prompt,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
-        TextButton(
-          onPressed: onPressed,
-          child: Text('$action  →'),
-        ),
+        TextButton(onPressed: onPressed, child: Text('$action  →')),
       ],
     );
   }
@@ -1678,8 +1693,8 @@ class _OrDivider extends StatelessWidget {
           child: Text(
             'or',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         const Expanded(child: Divider()),
@@ -1689,10 +1704,7 @@ class _OrDivider extends StatelessWidget {
 }
 
 class _GoogleAuthButton extends StatelessWidget {
-  const _GoogleAuthButton({
-    required this.isLoading,
-    required this.onPressed,
-  });
+  const _GoogleAuthButton({required this.isLoading, required this.onPressed});
 
   final bool isLoading;
   final VoidCallback? onPressed;
@@ -1743,10 +1755,7 @@ class _AuthSuccessStateState extends State<_AuthSuccessState>
       parent: _controller,
       curve: const Interval(0, 0.55, curve: Curves.easeOut),
     );
-    _scale = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-    );
+    _scale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
     _controller.forward();
   }
 
@@ -1800,17 +1809,17 @@ class _AuthSuccessStateState extends State<_AuthSuccessState>
               widget.title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.4,
-                  ),
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.4,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               widget.subtitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1839,15 +1848,19 @@ class _AuthMessage extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline_rounded, color: colorScheme.error, size: 20),
+            Icon(
+              Icons.error_outline_rounded,
+              color: colorScheme.error,
+              size: 20,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 message,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

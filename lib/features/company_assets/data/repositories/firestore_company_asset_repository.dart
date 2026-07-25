@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../shared/models/company_asset.dart';
 import '../../domain/repositories/company_asset_repository.dart';
@@ -7,12 +6,12 @@ import '../../domain/repositories/company_asset_repository.dart';
 class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
   const FirestoreCompanyAssetRepository({
     required FirebaseFirestore firestore,
-    required FirebaseAuth auth,
+    required String uid,
   }) : _firestore = firestore,
-       _auth = auth;
+       _uid = uid;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final String _uid;
 
   @override
   Stream<List<CompanyAsset>> watchAssets() {
@@ -46,7 +45,10 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
     final doc = _currentAssetsCollection().doc(asset.id);
 
     await doc.set(_assetToFirestore(asset, asset.id));
-    await _confirmDocumentExists(doc, 'Asset update was not confirmed by Firestore.');
+    await _confirmDocumentExists(
+      doc,
+      'Asset update was not confirmed by Firestore.',
+    );
   }
 
   @override
@@ -58,7 +60,10 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
       'archivedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await _confirmDocumentExists(doc, 'Asset archive was not confirmed by Firestore.');
+    await _confirmDocumentExists(
+      doc,
+      'Asset archive was not confirmed by Firestore.',
+    );
   }
 
   CollectionReference<Map<String, dynamic>> _currentAssetsCollection() {
@@ -75,7 +80,7 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
   }
 
   String? _currentUserIdOrNull() {
-    return _auth.currentUser?.uid;
+    return _uid;
   }
 
   CompanyAsset _assetFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {

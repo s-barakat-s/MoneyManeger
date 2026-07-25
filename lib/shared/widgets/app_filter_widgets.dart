@@ -49,10 +49,7 @@ class AppSearchFilterBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          AppFilterIconButton(
-            isActive: filtersActive,
-            onTap: onFilterTap,
-          ),
+          AppFilterIconButton(isActive: filtersActive, onTap: onFilterTap),
         ],
       ),
     );
@@ -71,8 +68,9 @@ class AppFilterIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background =
-        isActive ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface;
+    final background = isActive
+        ? Theme.of(context).colorScheme.primaryContainer
+        : Theme.of(context).colorScheme.surface;
     final foreground = isActive
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.onSurfaceVariant;
@@ -144,9 +142,9 @@ class AppFilterSheet extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: AppSpacing.lg),
               Flexible(
@@ -158,10 +156,7 @@ class AppFilterSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              AppFilterActionBar(
-                onClear: onClear,
-                onApply: onApply,
-              ),
+              AppFilterActionBar(onClear: onClear, onApply: onApply),
             ],
           ),
         ),
@@ -171,11 +166,7 @@ class AppFilterSheet extends StatelessWidget {
 }
 
 class AppFilterSection extends StatelessWidget {
-  const AppFilterSection({
-    required this.title,
-    required this.child,
-    super.key,
-  });
+  const AppFilterSection({required this.title, required this.child, super.key});
 
   final String title;
   final Widget child;
@@ -185,10 +176,7 @@ class AppFilterSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
+        Text(title, style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: AppSpacing.sm),
         child,
       ],
@@ -212,10 +200,7 @@ class AppFilterOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterChip(
       selected: selected,
-      label: Text(
-        label,
-        overflow: TextOverflow.ellipsis,
-      ),
+      label: Text(label, overflow: TextOverflow.ellipsis),
       onSelected: (_) => onSelected(),
       showCheckmark: false,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
@@ -257,10 +242,7 @@ class AppFilterActionBar extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: FilledButton(
-            onPressed: onApply,
-            child: const Text('Apply'),
-          ),
+          child: FilledButton(onPressed: onApply, child: const Text('Apply')),
         ),
       ],
     );

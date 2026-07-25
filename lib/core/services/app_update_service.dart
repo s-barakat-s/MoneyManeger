@@ -4,11 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-enum AppUpdatePlatform {
-  android,
-  windows,
-  unsupported,
-}
+enum AppUpdatePlatform { android, windows, unsupported }
 
 class AppUpdateInfo {
   const AppUpdateInfo({
@@ -29,9 +25,8 @@ class AppUpdateInfo {
 }
 
 class AppUpdateService {
-  AppUpdateService({
-    FirebaseRemoteConfig? remoteConfig,
-  }) : _remoteConfig = remoteConfig ?? FirebaseRemoteConfig.instance;
+  AppUpdateService({FirebaseRemoteConfig? remoteConfig})
+    : _remoteConfig = remoteConfig ?? FirebaseRemoteConfig.instance;
 
   static const _latestBuildKey = 'android_latest_build';
   static const _latestVersionKey = 'android_latest_version';
@@ -56,8 +51,9 @@ class AppUpdateService {
       await _remoteConfig.setConfigSettings(
         RemoteConfigSettings(
           fetchTimeout: const Duration(seconds: 10),
-          minimumFetchInterval:
-              kDebugMode ? Duration.zero : const Duration(hours: 1),
+          minimumFetchInterval: kDebugMode
+              ? Duration.zero
+              : const Duration(hours: 1),
         ),
       );
       await _remoteConfig.setDefaults(const {
@@ -150,19 +146,19 @@ class AppUpdateService {
   _RemoteConfigKeys _keysFor(AppUpdatePlatform platform) {
     return switch (platform) {
       AppUpdatePlatform.android => const _RemoteConfigKeys(
-          latestBuild: _latestBuildKey,
-          latestVersion: _latestVersionKey,
-          downloadUrl: _apkUrlKey,
-          forceUpdate: _forceUpdateKey,
-          message: _updateMessageKey,
-        ),
+        latestBuild: _latestBuildKey,
+        latestVersion: _latestVersionKey,
+        downloadUrl: _apkUrlKey,
+        forceUpdate: _forceUpdateKey,
+        message: _updateMessageKey,
+      ),
       AppUpdatePlatform.windows => const _RemoteConfigKeys(
-          latestBuild: _windowsLatestBuildKey,
-          latestVersion: _windowsLatestVersionKey,
-          downloadUrl: _windowsDownloadUrlKey,
-          forceUpdate: _windowsForceUpdateKey,
-          message: _windowsUpdateMessageKey,
-        ),
+        latestBuild: _windowsLatestBuildKey,
+        latestVersion: _windowsLatestVersionKey,
+        downloadUrl: _windowsDownloadUrlKey,
+        forceUpdate: _windowsForceUpdateKey,
+        message: _windowsUpdateMessageKey,
+      ),
       AppUpdatePlatform.unsupported => throw StateError('Unsupported platform'),
     };
   }

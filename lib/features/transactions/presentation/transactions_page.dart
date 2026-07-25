@@ -262,16 +262,14 @@ class _TransactionFilterSheetState extends State<_TransactionFilterSheet> {
               AppFilterOption(
                 label: 'Income',
                 selected: _type == money.TransactionType.income,
-                onSelected: () => setState(
-                  () => _type = money.TransactionType.income,
-                ),
+                onSelected: () =>
+                    setState(() => _type = money.TransactionType.income),
               ),
               AppFilterOption(
                 label: 'Expense',
                 selected: _type == money.TransactionType.expense,
-                onSelected: () => setState(
-                  () => _type = money.TransactionType.expense,
-                ),
+                onSelected: () =>
+                    setState(() => _type = money.TransactionType.expense),
               ),
             ],
           ),
@@ -293,10 +291,7 @@ class _TransactionFilterSheetState extends State<_TransactionFilterSheet> {
               for (final owner in widget.owners)
                 DropdownMenuItem<String?>(
                   value: owner.id,
-                  child: Text(
-                    owner.name,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(owner.name, overflow: TextOverflow.ellipsis),
                 ),
             ],
             onChanged: (value) => setState(() => _ownerId = value),
@@ -326,20 +321,21 @@ class _TransactionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ownerNames = {
-      for (final owner in owners) owner.id: owner.name,
-    };
-    final effectiveOwnerId =
-        ownerNames.containsKey(selectedOwnerId) ? selectedOwnerId : null;
+    final ownerNames = {for (final owner in owners) owner.id: owner.name};
+    final effectiveOwnerId = ownerNames.containsKey(selectedOwnerId)
+        ? selectedOwnerId
+        : null;
     final normalizedSearch = searchText.trim().toLowerCase();
-    final hasActiveFilters = normalizedSearch.isNotEmpty ||
+    final hasActiveFilters =
+        normalizedSearch.isNotEmpty ||
         selectedType != null ||
         effectiveOwnerId != null;
     final visibleTransactions = transactions.where((transaction) {
       final ownerName = ownerNames[transaction.ownerId] ?? '';
       final typeLabel = _labelForType(transaction.type);
       final note = transaction.note?.trim() ?? '';
-      final matchesSearch = normalizedSearch.isEmpty ||
+      final matchesSearch =
+          normalizedSearch.isEmpty ||
           note.toLowerCase().contains(normalizedSearch) ||
           typeLabel.toLowerCase().contains(normalizedSearch) ||
           ownerName.toLowerCase().contains(normalizedSearch);
@@ -377,7 +373,8 @@ class _TransactionsList extends StatelessWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleTransactions.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         final transaction = visibleTransactions[index];
         final ownerName = ownerNames[transaction.ownerId] ?? 'Unknown owner';
@@ -498,10 +495,7 @@ class _TransactionsList extends StatelessWidget {
 enum _TransactionAction { edit, archive }
 
 class _LedgerIcon extends StatelessWidget {
-  const _LedgerIcon({
-    required this.icon,
-    required this.color,
-  });
+  const _LedgerIcon({required this.icon, required this.color});
 
   final IconData icon;
   final Color color;

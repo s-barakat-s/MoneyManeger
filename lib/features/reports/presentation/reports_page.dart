@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_shell.dart';
 
 class ReportsPage extends StatelessWidget {
-  const ReportsPage({
-    required this.currentLocation,
-    super.key,
-  });
+  const ReportsPage({required this.currentLocation, super.key});
 
   final String currentLocation;
 

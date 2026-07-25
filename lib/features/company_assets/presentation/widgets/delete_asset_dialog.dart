@@ -5,10 +5,7 @@ import '../../../../shared/models/company_asset.dart';
 import '../../application/company_asset_providers.dart';
 
 class DeleteAssetDialog extends ConsumerStatefulWidget {
-  const DeleteAssetDialog({
-    required this.asset,
-    super.key,
-  });
+  const DeleteAssetDialog({required this.asset, super.key});
 
   final CompanyAsset asset;
 
@@ -65,7 +62,9 @@ class _DeleteAssetDialogState extends ConsumerState<DeleteAssetDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not archive asset. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not archive asset. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

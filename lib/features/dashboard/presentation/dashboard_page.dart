@@ -20,14 +20,13 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../company_assets/application/company_asset_providers.dart';
+import '../../auth/application/account_switch_controller.dart';
+import '../../auth/application/auth_providers.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
 
 class DashboardPage extends ConsumerWidget {
-  const DashboardPage({
-    required this.currentLocation,
-    super.key,
-  });
+  const DashboardPage({required this.currentLocation, super.key});
 
   final String currentLocation;
 
@@ -40,6 +39,11 @@ class DashboardPage extends ConsumerWidget {
     final assetsAsync = ref.watch(totalAssetsValueProvider);
     final transactionsAsync = ref.watch(financialTransactionsProvider);
     final ownerBalancesAsync = ref.watch(ownerBalancesProvider);
+    ref.listen(ownersStreamProvider, (previous, next) {
+      if (next.hasError && previous?.error != next.error) {
+        _logDashboardFailure(ref, next.error!, next.stackTrace!);
+      }
+    });
 
     return AppShell(
       title: 'Dashboard',
@@ -56,11 +60,42 @@ class DashboardPage extends ConsumerWidget {
           ownerBalancesAsync: ownerBalancesAsync,
         ),
         loading: () => const LoadingSkeleton(itemCount: 5),
-        error: (error, stackTrace) => const ErrorState(
+        error: (error, stackTrace) => ErrorState(
           title: 'Home unavailable',
           message: 'We could not load your business overview right now.',
+          onRetry: () => _retryDashboard(ref),
         ),
       ),
+    );
+  }
+
+  void _retryDashboard(WidgetRef ref) {
+    ref.invalidate(ownersStreamProvider);
+    ref.invalidate(financialTransactionsProvider);
+    ref.invalidate(financialTransfersProvider);
+    ref.invalidate(debtsStreamProvider);
+    ref.invalidate(assetsStreamProvider);
+  }
+
+  void _logDashboardFailure(
+    WidgetRef ref,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    if (!kDebugMode) return;
+    final uid = ref.read(currentUidProvider);
+    final switchState = ref.read(accountSwitchControllerProvider);
+    debugPrint(
+      'Dashboard provider failed: provider=ownersStreamProvider, '
+      'repository=FirestoreOwnerRepository(uid=$uid), '
+      'path=users/$uid/owners, exceptionType=${error.runtimeType}, '
+      'message=$error, FirebaseAuth.currentUserIsNull=${uid == null}, '
+      'accountSwitchLoading=${switchState is AccountSwitchLoading}, '
+      'repositoryUidIsImmutable=true.',
+    );
+    debugPrintStack(
+      label: 'ownersStreamProvider stack trace',
+      stackTrace: stackTrace,
     );
   }
 }
@@ -253,9 +288,9 @@ class _BalanceHeroCard extends StatelessWidget {
                       child: Text(
                         'Available Cash',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.78),
-                              fontWeight: FontWeight.w700,
-                            ),
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     Icon(
@@ -271,10 +306,10 @@ class _BalanceHeroCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        color: Colors.white,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Container(
@@ -300,7 +335,8 @@ class _BalanceHeroCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Company Worth',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.78),
                                 fontWeight: FontWeight.w600,
                               ),
@@ -310,7 +346,8 @@ class _BalanceHeroCard extends StatelessWidget {
                         _moneyValue(worthAsync),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
                             ),
@@ -408,8 +445,8 @@ class _FinancialBreakdownSheet extends StatelessWidget {
               Text(
                 'Financial Breakdown',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
@@ -469,10 +506,9 @@ class _AvailableCashBreakdown extends StatelessWidget {
             0,
             (total, row) => total + row.amount,
           );
-          final cashTotal = cashAsync.value ?? balances.values.fold<double>(
-            0,
-            (total, value) => total + value,
-          );
+          final cashTotal =
+              cashAsync.value ??
+              balances.values.fold<double>(0, (total, value) => total + value);
           final adjustment = cashTotal - knownTotal;
           final shouldShowOther = adjustment.abs() > 0.01;
 
@@ -541,7 +577,8 @@ class _CompanyWorthBreakdown extends StatelessWidget {
 
     return _BreakdownCard(
       title: 'Company Worth',
-      description: 'Company Worth = Available Cash + Receivables + Assets - Debts.',
+      description:
+          'Company Worth = Available Cash + Receivables + Assets - Debts.',
       children: [
         _BreakdownAmountRow(
           label: 'Available Cash',
@@ -571,8 +608,8 @@ class _CompanyWorthBreakdown extends StatelessWidget {
           color: worth > 0
               ? AppColors.success
               : worth < 0
-                  ? AppColors.danger
-                  : Theme.of(context).colorScheme.onSurface,
+              ? AppColors.danger
+              : Theme.of(context).colorScheme.onSurface,
           isStrong: true,
         ),
       ],
@@ -600,9 +637,9 @@ class _BreakdownCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(description, style: Theme.of(context).textTheme.bodySmall),
@@ -643,9 +680,9 @@ class _BreakdownAmountRow extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: isStrong ? FontWeight.w800 : FontWeight.w600,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: isStrong ? FontWeight.w800 : FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -656,9 +693,9 @@ class _BreakdownAmountRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.end,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: color,
-                    fontWeight: isStrong ? FontWeight.w900 : FontWeight.w800,
-                  ),
+                color: color,
+                fontWeight: isStrong ? FontWeight.w900 : FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -739,7 +776,9 @@ class _FinancialSnapshotGrid extends StatelessWidget {
       ),
       _MetricData(
         title: 'Receivables',
-        value: _moneyValue(receivablesAsync.whenData((value) => value.remaining)),
+        value: _moneyValue(
+          receivablesAsync.whenData((value) => value.remaining),
+        ),
         icon: Icons.payments_rounded,
         color: AppColors.info,
         route: AppRoute.receivables,
@@ -776,9 +815,8 @@ class _FinancialSnapshotGrid extends StatelessWidget {
               mainAxisSpacing: AppSpacing.md,
               childAspectRatio: constraints.maxWidth < 360 ? 1 : 1.15,
             ),
-            itemBuilder: (context, index) => _MetricCard(
-              data: shortcuts[index],
-            ),
+            itemBuilder: (context, index) =>
+                _MetricCard(data: shortcuts[index]),
           );
         },
       ),
@@ -819,10 +857,10 @@ class _MetricCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
@@ -830,9 +868,9 @@ class _MetricCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -841,19 +879,16 @@ class _MetricCard extends StatelessWidget {
   }
 
   String _heroTagFor(AppRoute? route) => switch (route) {
-        AppRoute.debts => HomeSummaryHeroTags.debts,
-        AppRoute.receivables => HomeSummaryHeroTags.receivables,
-        AppRoute.companyAssets => HomeSummaryHeroTags.assets,
-        AppRoute.owners => HomeSummaryHeroTags.owners,
-        _ => 'home-summary-${route?.name ?? 'unknown'}',
-      };
+    AppRoute.debts => HomeSummaryHeroTags.debts,
+    AppRoute.receivables => HomeSummaryHeroTags.receivables,
+    AppRoute.companyAssets => HomeSummaryHeroTags.assets,
+    AppRoute.owners => HomeSummaryHeroTags.owners,
+    _ => 'home-summary-${route?.name ?? 'unknown'}',
+  };
 }
 
 class _ShortcutIcon extends StatelessWidget {
-  const _ShortcutIcon({
-    required this.icon,
-    required this.color,
-  });
+  const _ShortcutIcon({required this.icon, required this.color});
 
   final IconData icon;
   final Color color;
@@ -997,8 +1032,9 @@ class _TransactionActivityTile extends StatelessWidget {
             const SizedBox(width: AppSpacing.md),
             AmountText(
               amount: amount,
-              variant:
-                  isIncome ? AmountTextVariant.income : AmountTextVariant.expense,
+              variant: isIncome
+                  ? AmountTextVariant.income
+                  : AmountTextVariant.expense,
             ),
           ],
         ),
@@ -1023,7 +1059,11 @@ class _FinancialHealthCard extends StatelessWidget {
     final cash = cashAsync.value ?? 0;
     final debts = debtsAsync.value?.remaining ?? 0;
     final receivables = receivablesAsync.value?.remaining ?? 0;
-    final health = _healthFor(cash: cash, debts: debts, receivables: receivables);
+    final health = _healthFor(
+      cash: cash,
+      debts: debts,
+      receivables: receivables,
+    );
 
     return _DashboardSection(
       title: 'Financial Health',
@@ -1047,7 +1087,10 @@ class _FinancialHealthCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(health.title, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    health.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(health.message),
                 ],
@@ -1105,10 +1148,7 @@ class _HealthState {
 }
 
 class _DashboardSection extends StatelessWidget {
-  const _DashboardSection({
-    required this.title,
-    required this.child,
-  });
+  const _DashboardSection({required this.title, required this.child});
 
   final String title;
   final Widget child;
@@ -1200,8 +1240,7 @@ String _moneyValue(AsyncValue<double> value) {
   return value.when(
     data: formatEgpCurrency,
     loading: () => 'Loading...',
-    error: (error, stackTrace) =>
-        kDebugMode ? 'Error: $error' : 'Unavailable',
+    error: (error, stackTrace) => kDebugMode ? 'Error: $error' : 'Unavailable',
   );
 }
 

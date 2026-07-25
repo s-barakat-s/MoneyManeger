@@ -33,10 +33,7 @@ class AppCard extends StatelessWidget {
         border: Border.all(color: borderColor ?? colorScheme.outline),
         boxShadow: isDark ? const [] : AppShadows.soft,
       ),
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
+      child: Padding(padding: padding, child: child),
     );
 
     return Padding(

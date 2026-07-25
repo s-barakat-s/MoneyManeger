@@ -4,23 +4,51 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-class AuthService {
-  const AuthService({
-    required FirebaseAuth auth,
-  }) : _auth = auth;
+abstract interface class AccountSwitcher {
+  Future<AuthenticatedAccount> switchGoogleAccount();
+  Future<AuthenticatedAccount> switchPasswordAccount({
+    required String email,
+    required String password,
+  });
+  Future<void> endCurrentSession();
+}
+
+class AuthenticatedAccount {
+  const AuthenticatedAccount({required this.uid, required this.email});
+
+  final String uid;
+  final String? email;
+}
+
+class AuthService implements AccountSwitcher {
+  const AuthService({required FirebaseAuth auth}) : _auth = auth;
 
   final FirebaseAuth _auth;
   static Future<void>? _googleInitialization;
   static Future<void>? _activeSignOut;
 
+  User? get currentUser => _auth.currentUser;
+
   Future<UserCredential> signInWithEmailPassword({
     required String email,
     required String password,
   }) {
-    return FirebaseAuth.instance.signInWithEmailAndPassword(
+    return _auth.signInWithEmailAndPassword(
       email: email.trim().toLowerCase(),
       password: password,
     );
+  }
+
+  @override
+  Future<AuthenticatedAccount> switchPasswordAccount({
+    required String email,
+    required String password,
+  }) async {
+    final credential = await signInWithEmailPassword(
+      email: email,
+      password: password,
+    );
+    return _authenticatedAccount(credential);
   }
 
   Future<UserCredential> signInWithGoogle() async {
@@ -42,6 +70,59 @@ class AuthService {
 
     final credential = GoogleAuthProvider.credential(idToken: idToken);
     return FirebaseAuth.instance.signInWithCredential(credential);
+  }
+
+  @override
+  Future<AuthenticatedAccount> switchGoogleAccount() async {
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters(const {'prompt': 'select_account'});
+      // Keeping the current Firebase session until the popup succeeds lets a
+      // canceled browser chooser preserve the current account.
+      final credential = await _auth.signInWithPopup(provider);
+      return _authenticatedAccount(credential);
+    }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      throw const GoogleSignInUnavailableException();
+    }
+
+    final googleSignIn = GoogleSignIn.instance;
+    _googleInitialization ??= googleSignIn.initialize();
+    await _googleInitialization;
+
+    // Google Sign-In 7.x requires clearing its current authentication before
+    // authenticate() will present account selection again.
+    await googleSignIn.signOut();
+    await _auth.signOut();
+
+    final account = await googleSignIn.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw const GoogleSignInTokenException();
+    }
+
+    final credential = await _auth.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: idToken),
+    );
+    return _authenticatedAccount(credential);
+  }
+
+  @override
+  Future<void> endCurrentSession() => signOut();
+
+  Future<AuthenticatedAccount> _authenticatedAccount(
+    UserCredential credential,
+  ) async {
+    final user = credential.user;
+    if (user == null) throw const NoAuthenticatedUserException();
+    await user.reload();
+    final refreshedUser = _auth.currentUser;
+    if (refreshedUser == null) throw const NoAuthenticatedUserException();
+    await refreshedUser.getIdToken(true);
+    return AuthenticatedAccount(
+      uid: refreshedUser.uid,
+      email: refreshedUser.email,
+    );
   }
 
   Future<void> reauthenticateCurrentUserWithGoogle() async {
@@ -72,9 +153,7 @@ class AuthService {
             'code=${error.code}, message=${error.message}',
           );
         } else {
-          debugPrint(
-            'Google re-authentication failed: ${error.runtimeType}.',
-          );
+          debugPrint('Google re-authentication failed: ${error.runtimeType}.');
         }
       }
       rethrow;
@@ -247,7 +326,8 @@ class AuthService {
   Future<void> _signOutOnce() async {
     if (kDebugMode) debugPrint('Authentication sign-out started.');
 
-    final hasGoogleProvider = _auth.currentUser?.providerData.any(
+    final hasGoogleProvider =
+        _auth.currentUser?.providerData.any(
           (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
         ) ??
         false;
@@ -312,17 +392,17 @@ class AuthService {
 
     final firestore = FirebaseFirestore.instance;
     final profileRef = firestore.collection('users').doc(user.uid);
-    final newUsernameRef =
-        firestore.collection('usernames').doc(normalizedUsername);
+    final newUsernameRef = firestore
+        .collection('usernames')
+        .doc(normalizedUsername);
 
     if (kDebugMode) debugPrint('Username change transaction started.');
     try {
       await firestore.runTransaction<void>((transaction) async {
         final profileSnapshot = await transaction.get(profileRef);
-        final oldUsername =
-            (profileSnapshot.data()?['username'] as String?)
-                ?.trim()
-                .toLowerCase();
+        final oldUsername = (profileSnapshot.data()?['username'] as String?)
+            ?.trim()
+            .toLowerCase();
         if (oldUsername == normalizedUsername) return;
 
         final newReservation = await transaction.get(newUsernameRef);
@@ -338,25 +418,16 @@ class AuthService {
           oldReservation = await transaction.get(oldUsernameRef);
         }
 
-        transaction.set(
-          profileRef,
-          {
-            'username': normalizedUsername,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-        transaction.set(
-          newUsernameRef,
-          {
-            'uid': user.uid,
-            'username': normalizedUsername,
-            if (!newReservation.exists)
-              'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
+        transaction.set(profileRef, {
+          'username': normalizedUsername,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        transaction.set(newUsernameRef, {
+          'uid': user.uid,
+          'username': normalizedUsername,
+          if (!newReservation.exists) 'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
         if (oldUsernameRef != null &&
             oldReservation?.data()?['uid'] == user.uid) {
           transaction.delete(oldUsernameRef);
@@ -390,8 +461,9 @@ class AuthService {
       (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
     );
     final firestore = FirebaseFirestore.instance;
-    final usernameRef =
-        firestore.collection('usernames').doc(normalizedUsername);
+    final usernameRef = firestore
+        .collection('usernames')
+        .doc(normalizedUsername);
     final profileRef = firestore.collection('users').doc(user.uid);
 
     if (kDebugMode) {
@@ -466,10 +538,7 @@ class AuthService {
 }
 
 class ProfileCreationException implements Exception {
-  const ProfileCreationException({
-    this.cause,
-    this.cleanupFailed = false,
-  });
+  const ProfileCreationException({this.cause, this.cleanupFailed = false});
 
   final Object? cause;
   final bool cleanupFailed;

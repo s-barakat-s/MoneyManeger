@@ -10,9 +10,10 @@ class BalanceCalculator {
     required List<Transfer> transfers,
   }) {
     return calculateBalances(
-      transactions: transactions,
-      transfers: transfers,
-    )[ownerId] ?? 0;
+          transactions: transactions,
+          transfers: transfers,
+        )[ownerId] ??
+        0;
   }
 
   Map<String, double> calculateBalances({
@@ -52,7 +53,9 @@ class BalanceCalculator {
 
   double totalIncome(List<money.Transaction> transactions) {
     return transactions
-        .where((transaction) => transaction.type == money.TransactionType.income)
+        .where(
+          (transaction) => transaction.type == money.TransactionType.income,
+        )
         .fold(0, (total, transaction) => total + transaction.amount);
   }
 

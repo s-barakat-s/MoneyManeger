@@ -34,8 +34,8 @@ class _FirebaseRuntimeDiagnosticsPanelState
     final authType = user == null
         ? 'Signed out'
         : user.isAnonymous
-            ? 'Anonymous'
-            : 'Email/password';
+        ? 'Anonymous'
+        : 'Email/password';
 
     return Card(
       child: Padding(
@@ -117,24 +117,19 @@ class _FirebaseRuntimeDiagnosticsPanelState
     });
 
     try {
-      final doc = FirebaseFirestore.instanceFor(app: app)
-          .collection('users')
-          .doc(uid)
-          .collection('_debug')
-          .doc('runtime_check');
+      final doc = FirebaseFirestore.instanceFor(
+        app: app,
+      ).collection('users').doc(uid).collection('_debug').doc('runtime_check');
 
-      await doc.set(
-        {
-          'projectId': app.options.projectId,
-          'appId': app.options.appId,
-          'uid': uid,
-          'isAnonymous': user?.isAnonymous,
-          'email': user?.email,
-          'checkedAt': FieldValue.serverTimestamp(),
-          'checkedAtLocal': DateTime.now().toIso8601String(),
-        },
-        SetOptions(merge: true),
-      );
+      await doc.set({
+        'projectId': app.options.projectId,
+        'appId': app.options.appId,
+        'uid': uid,
+        'isAnonymous': user?.isAnonymous,
+        'email': user?.email,
+        'checkedAt': FieldValue.serverTimestamp(),
+        'checkedAtLocal': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
 
       final writeFinishedAt = DateTime.now();
       final snapshot = await doc.get(const GetOptions(source: Source.server));
@@ -187,10 +182,7 @@ class _FirebaseRuntimeDiagnosticsPanelState
 }
 
 class _DiagnosticRow extends StatelessWidget {
-  const _DiagnosticRow({
-    required this.label,
-    required this.value,
-  });
+  const _DiagnosticRow({required this.label, required this.value});
 
   final String label;
   final String value;

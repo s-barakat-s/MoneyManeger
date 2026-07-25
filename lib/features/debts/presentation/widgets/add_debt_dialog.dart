@@ -8,11 +8,7 @@ import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/debt_providers.dart';
 
 class AddDebtDialog extends ConsumerStatefulWidget {
-  const AddDebtDialog({
-    required this.type,
-    this.debt,
-    super.key,
-  });
+  const AddDebtDialog({required this.type, this.debt, super.key});
 
   final DebtType type;
   final Debt? debt;
@@ -189,22 +185,22 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
 
     try {
       await ref.read(createDebtProvider)(
-            Debt(
-              id: widget.debt?.id ?? '',
-              personName: _personController.text.trim(),
-              type: widget.type,
-              totalAmount: double.parse(_amountController.text.trim()),
-              paidAmount: widget.debt?.paidAmount ?? 0,
-              status: widget.debt?.status ?? DebtStatus.active,
-              createdAt: _createdAt,
-              updatedAt: _isEditing ? DateTime.now() : null,
-              dueDate: _dueDate,
-              archivedAt: widget.debt?.archivedAt,
-              note: _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-            ),
-          );
+        Debt(
+          id: widget.debt?.id ?? '',
+          personName: _personController.text.trim(),
+          type: widget.type,
+          totalAmount: double.parse(_amountController.text.trim()),
+          paidAmount: widget.debt?.paidAmount ?? 0,
+          status: widget.debt?.status ?? DebtStatus.active,
+          createdAt: _createdAt,
+          updatedAt: _isEditing ? DateTime.now() : null,
+          dueDate: _dueDate,
+          archivedAt: widget.debt?.archivedAt,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+        ),
+      );
 
       if (mounted) {
         Navigator.of(context).pop();

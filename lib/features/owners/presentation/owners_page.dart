@@ -64,23 +64,23 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          PageHeader(
-            title: 'Owners / Money Holders',
-            actionLabel: 'Add holder',
-            actionIcon: Icons.add,
-            onAction: () => _showAddDialog(context),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: ownersAsync.when(
-              data: (owners) => _OwnersList(owners: owners),
-              loading: () => const LoadingSkeleton(itemCount: 4),
-              error: (error, stackTrace) => const ErrorState(
-                title: 'Money holders unavailable',
-                message: 'We could not load your money holders right now.',
+            PageHeader(
+              title: 'Owners / Money Holders',
+              actionLabel: 'Add holder',
+              actionIcon: Icons.add,
+              onAction: () => _showAddDialog(context),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: ownersAsync.when(
+                data: (owners) => _OwnersList(owners: owners),
+                loading: () => const LoadingSkeleton(itemCount: 4),
+                error: (error, stackTrace) => const ErrorState(
+                  title: 'Money holders unavailable',
+                  message: 'We could not load your money holders right now.',
+                ),
               ),
             ),
-          ),
           ],
         ),
       ),
@@ -130,7 +130,8 @@ class _OwnersList extends ConsumerWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: owners.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
         final owner = owners[index];
         final balance = ref.watch(ownerBalanceProvider(owner.id));
@@ -165,7 +166,8 @@ class _OwnersList extends ConsumerWidget {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
                             color: Theme.of(context).colorScheme.onSurface,
@@ -186,10 +188,7 @@ class _OwnersList extends ConsumerWidget {
                   }
                 },
                 itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _OwnerAction.edit,
-                    child: Text('Edit'),
-                  ),
+                  PopupMenuItem(value: _OwnerAction.edit, child: Text('Edit')),
                   PopupMenuItem(
                     value: _OwnerAction.archive,
                     child: Text('Archive'),
@@ -246,9 +245,9 @@ class _OwnerAvatar extends StatelessWidget {
             initial,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),

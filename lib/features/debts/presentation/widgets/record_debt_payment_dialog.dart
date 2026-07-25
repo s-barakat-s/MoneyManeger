@@ -185,23 +185,22 @@ class _RecordDebtPaymentDialogState
 
     try {
       await ref.read(recordDebtPaymentProvider)(
-            debt: widget.debt,
-            ownerId: _ownerId!,
-            payment: DebtPayment(
-              id: '',
-              debtId: widget.debt.id,
-              amount: double.parse(_amountController.text.trim()),
-              date: _date,
-              note: _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-            ),
-          );
+        debt: widget.debt,
+        ownerId: _ownerId!,
+        payment: DebtPayment(
+          id: '',
+          debtId: widget.debt.id,
+          amount: double.parse(_amountController.text.trim()),
+          date: _date,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+        ),
+      );
 
-      await ref.read(lastUsedSelectionProvider).save(
-            _selectionPreference,
-            _ownerId!,
-          );
+      await ref
+          .read(lastUsedSelectionProvider)
+          .save(_selectionPreference, _ownerId!);
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -238,8 +237,9 @@ class _RecordDebtPaymentDialogState
     _didInitializeOwner = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final remembered =
-          await ref.read(lastUsedSelectionProvider).read(_selectionPreference);
+      final remembered = await ref
+          .read(lastUsedSelectionProvider)
+          .read(_selectionPreference);
       if (!mounted || _ownerId != null) {
         return;
       }

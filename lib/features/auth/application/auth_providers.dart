@@ -7,7 +7,7 @@ import '../../../core/firebase/firebase_providers.dart';
 import '../data/auth_service.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
-  final auth = FirebaseAuth.instance;
+  final auth = ref.watch(firebaseAuthProvider);
   String? refreshedUid;
 
   return auth.userChanges().asyncMap((user) async {
@@ -22,7 +22,11 @@ final authStateProvider = StreamProvider<User?>((ref) {
     refreshedUid = user.uid;
     try {
       await user.reload();
-      return auth.currentUser;
+      final refreshedUser = auth.currentUser;
+      if (refreshedUser?.emailVerified == true) {
+        await refreshedUser!.getIdToken(true);
+      }
+      return refreshedUser;
     } catch (error, stackTrace) {
       if (kDebugMode) {
         debugPrint('Could not refresh authenticated user: $error');
@@ -33,37 +37,63 @@ final authStateProvider = StreamProvider<User?>((ref) {
   });
 });
 
-final userProfileStatusProvider =
-    StreamProvider.autoDispose.family<UserProfileStatus, String>((ref, uid) {
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .snapshots()
-      .map((snapshot) {
-        final data = snapshot.data();
-        final username = data?['username'];
-        final validUsername = username is String &&
-            RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username);
-        return UserProfileStatus(
-          exists: snapshot.exists,
-          isComplete: snapshot.exists &&
-              data?['profileCompleted'] == true &&
-              validUsername,
-        );
-      })
-      .handleError((Object error, StackTrace stackTrace) {
-        if (kDebugMode) {
-          debugPrint('Could not load auth profile: $error');
-          debugPrintStack(stackTrace: stackTrace);
-        }
-      });
+final currentUidProvider = Provider<String?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState is AsyncData<User?> ? authState.value?.uid : null;
 });
 
+class AppUserProfile {
+  const AppUserProfile({required this.username});
+
+  final String? username;
+}
+
+final userProfileProvider = StreamProvider.autoDispose
+    .family<AppUserProfile, String>((ref, uid) {
+      return ref
+          .watch(firebaseFirestoreProvider)
+          .collection('users')
+          .doc(uid)
+          .snapshots()
+          .map((snapshot) {
+            final rawUsername = snapshot.data()?['username'];
+            final username = rawUsername is String ? rawUsername.trim() : null;
+            return AppUserProfile(
+              username: username == null || username.isEmpty ? null : username,
+            );
+          });
+    });
+
+final userProfileStatusProvider = StreamProvider.autoDispose
+    .family<UserProfileStatus, String>((ref, uid) {
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots()
+          .map((snapshot) {
+            final data = snapshot.data();
+            final username = data?['username'];
+            final validUsername =
+                username is String &&
+                RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username);
+            return UserProfileStatus(
+              exists: snapshot.exists,
+              isComplete:
+                  snapshot.exists &&
+                  data?['profileCompleted'] == true &&
+                  validUsername,
+            );
+          })
+          .handleError((Object error, StackTrace stackTrace) {
+            if (kDebugMode) {
+              debugPrint('Could not load auth profile: $error');
+              debugPrintStack(stackTrace: stackTrace);
+            }
+          });
+    });
+
 class UserProfileStatus {
-  const UserProfileStatus({
-    required this.exists,
-    required this.isComplete,
-  });
+  const UserProfileStatus({required this.exists, required this.isComplete});
 
   final bool exists;
   final bool isComplete;
@@ -71,8 +101,8 @@ class UserProfileStatus {
 
 final registrationInProgressProvider =
     NotifierProvider<RegistrationFlowController, bool>(
-  RegistrationFlowController.new,
-);
+      RegistrationFlowController.new,
+    );
 
 class RegistrationFlowController extends Notifier<bool> {
   @override
@@ -97,8 +127,8 @@ class VerificationEmailState {
 
 final verificationEmailStateProvider =
     NotifierProvider<VerificationEmailController, VerificationEmailState>(
-  VerificationEmailController.new,
-);
+      VerificationEmailController.new,
+    );
 
 class VerificationEmailController extends Notifier<VerificationEmailState> {
   @override
@@ -107,18 +137,16 @@ class VerificationEmailController extends Notifier<VerificationEmailState> {
   void reset() => state = const VerificationEmailState();
 
   void markSent(String uid) => state = VerificationEmailState(
-        uid: uid,
-        delivery: VerificationEmailDelivery.sent,
-      );
+    uid: uid,
+    delivery: VerificationEmailDelivery.sent,
+  );
 
   void markFailed(String uid) => state = VerificationEmailState(
-        uid: uid,
-        delivery: VerificationEmailDelivery.failed,
-      );
+    uid: uid,
+    delivery: VerificationEmailDelivery.failed,
+  );
 }
 
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(
-    auth: ref.watch(firebaseAuthProvider),
-  );
+  return AuthService(auth: ref.watch(firebaseAuthProvider));
 });

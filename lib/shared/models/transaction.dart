@@ -4,10 +4,7 @@ part 'transaction.freezed.dart';
 part 'transaction.g.dart';
 
 /// The direction of a transaction for a single owner.
-enum TransactionType {
-  income,
-  expense,
-}
+enum TransactionType { income, expense }
 
 /// A money movement attached to one owner.
 @freezed

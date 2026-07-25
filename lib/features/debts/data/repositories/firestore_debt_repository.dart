@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../shared/models/debt.dart';
 import '../../../../shared/models/debt_payment.dart';
@@ -9,12 +8,12 @@ import '../../domain/repositories/debt_repository.dart';
 class FirestoreDebtRepository implements DebtRepository {
   const FirestoreDebtRepository({
     required FirebaseFirestore firestore,
-    required FirebaseAuth auth,
+    required String uid,
   }) : _firestore = firestore,
-       _auth = auth;
+       _uid = uid;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final String _uid;
 
   @override
   Stream<List<Debt>> watchDebts() {
@@ -73,7 +72,10 @@ class FirestoreDebtRepository implements DebtRepository {
       'archivedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await _confirmDocumentExists(doc, 'Debt archive was not confirmed by Firestore.');
+    await _confirmDocumentExists(
+      doc,
+      'Debt archive was not confirmed by Firestore.',
+    );
   }
 
   @override
@@ -110,7 +112,9 @@ class FirestoreDebtRepository implements DebtRepository {
   @override
   Future<void> savePayment(DebtPayment payment) async {
     final collection = _currentPaymentsCollection();
-    final doc = payment.id.isEmpty ? collection.doc() : collection.doc(payment.id);
+    final doc = payment.id.isEmpty
+        ? collection.doc()
+        : collection.doc(payment.id);
 
     await doc.set(_paymentToFirestore(payment, doc.id));
   }
@@ -152,7 +156,9 @@ class FirestoreDebtRepository implements DebtRepository {
         throw StateError('This debt is already paid.');
       }
       if (payment.amount > remainingAmount) {
-        throw StateError('Payment amount is greater than the remaining amount.');
+        throw StateError(
+          'Payment amount is greater than the remaining amount.',
+        );
       }
 
       final updatedPaidAmount = (paidAmount + payment.amount)
@@ -166,33 +172,30 @@ class FirestoreDebtRepository implements DebtRepository {
         paymentDoc,
         _paymentToFirestore(payment, paymentDoc.id),
       );
-      firestoreTransaction.set(
-        debtDoc,
-        {
-          'paidAmount': updatedPaidAmount,
-          'status': status.name,
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
-      );
-      firestoreTransaction.set(
-        transactionDoc,
-        {
-          'id': transactionDoc.id,
-          'ownerId': ownerId,
-          'type': _transactionTypeForDebt(serverDebt).name,
-          'amount': payment.amount,
-          'date': Timestamp.fromDate(payment.date),
-          'note': _paymentTransactionNote(serverDebt, payment),
-        },
-      );
+      firestoreTransaction.set(debtDoc, {
+        'paidAmount': updatedPaidAmount,
+        'status': status.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      firestoreTransaction.set(transactionDoc, {
+        'id': transactionDoc.id,
+        'ownerId': ownerId,
+        'type': _transactionTypeForDebt(serverDebt).name,
+        'amount': payment.amount,
+        'date': Timestamp.fromDate(payment.date),
+        'note': _paymentTransactionNote(serverDebt, payment),
+      });
 
       return updatedPaidAmount;
     });
 
-    final debtSnapshot = await debtDoc.get(const GetOptions(source: Source.server));
+    final debtSnapshot = await debtDoc.get(
+      const GetOptions(source: Source.server),
+    );
     final serverPaid = (debtSnapshot.data()?['paidAmount'] as num?)?.toDouble();
-    if (!debtSnapshot.exists || serverPaid == null || serverPaid < newPaidAmount) {
+    if (!debtSnapshot.exists ||
+        serverPaid == null ||
+        serverPaid < newPaidAmount) {
       throw FirebaseException(
         plugin: 'cloud_firestore',
         code: 'server-write-not-confirmed',
@@ -210,7 +213,10 @@ class FirestoreDebtRepository implements DebtRepository {
       'archivedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await _confirmDocumentExists(doc, 'Payment archive was not confirmed by Firestore.');
+    await _confirmDocumentExists(
+      doc,
+      'Payment archive was not confirmed by Firestore.',
+    );
   }
 
   CollectionReference<Map<String, dynamic>> _currentDebtsCollection() {
@@ -249,7 +255,7 @@ class FirestoreDebtRepository implements DebtRepository {
   }
 
   String? _currentUserIdOrNull() {
-    return _auth.currentUser?.uid;
+    return _uid;
   }
 
   Debt _debtFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -294,7 +300,9 @@ class FirestoreDebtRepository implements DebtRepository {
       'status': debt.status.name,
       'createdAt': Timestamp.fromDate(debt.createdAt),
       'updatedAt': Timestamp.fromDate(debt.updatedAt ?? DateTime.now()),
-      'dueDate': debt.dueDate == null ? null : Timestamp.fromDate(debt.dueDate!),
+      'dueDate': debt.dueDate == null
+          ? null
+          : Timestamp.fromDate(debt.dueDate!),
       'archivedAt': debt.archivedAt == null
           ? null
           : Timestamp.fromDate(debt.archivedAt!),

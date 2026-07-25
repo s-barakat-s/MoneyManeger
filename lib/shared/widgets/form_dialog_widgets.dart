@@ -72,10 +72,7 @@ class DialogDateField extends StatelessWidget {
             labelText: label,
             suffixIcon: trailing ?? const Icon(Icons.calendar_today_outlined),
           ),
-          child: Text(
-            value,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+          child: Text(value, style: Theme.of(context).textTheme.bodyLarge),
         ),
       ),
     );
@@ -83,8 +80,5 @@ class DialogDateField extends StatelessWidget {
 }
 
 InputDecoration amountInputDecoration(String label) {
-  return InputDecoration(
-    labelText: label,
-    prefixText: 'EGP ',
-  );
+  return InputDecoration(labelText: label, prefixText: 'EGP ');
 }

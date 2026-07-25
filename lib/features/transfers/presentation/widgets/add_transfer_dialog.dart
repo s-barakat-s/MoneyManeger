@@ -98,28 +98,22 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
 
     try {
       await ref.read(createTransferProvider)(
-            Transfer(
-              id: '',
-              fromOwnerId: _fromOwnerId!,
-              toOwnerId: _toOwnerId!,
-              amount: double.parse(_amountController.text.trim()),
-              date: _date,
-              note: _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-            ),
-          );
+        Transfer(
+          id: '',
+          fromOwnerId: _fromOwnerId!,
+          toOwnerId: _toOwnerId!,
+          amount: double.parse(_amountController.text.trim()),
+          date: _date,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+        ),
+      );
 
       final selections = ref.read(lastUsedSelectionProvider);
       await Future.wait([
-        selections.save(
-          LastUsedOwnerSelection.transferFrom,
-          _fromOwnerId!,
-        ),
-        selections.save(
-          LastUsedOwnerSelection.transferTo,
-          _toOwnerId!,
-        ),
+        selections.save(LastUsedOwnerSelection.transferFrom, _fromOwnerId!),
+        selections.save(LastUsedOwnerSelection.transferTo, _toOwnerId!),
       ]);
 
       if (mounted) {
@@ -170,21 +164,22 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
 
       final rememberedFrom = remembered[0];
       final rememberedTo = remembered[1];
-      final currentFromIsValid =
-          owners.any((owner) => owner.id == _fromOwnerId);
+      final currentFromIsValid = owners.any(
+        (owner) => owner.id == _fromOwnerId,
+      );
       final currentToIsValid = owners.any((owner) => owner.id == _toOwnerId);
       final fromId = currentFromIsValid
           ? _fromOwnerId!
           : owners.any((owner) => owner.id == rememberedFrom)
-              ? rememberedFrom!
-              : owners.first.id;
+          ? rememberedFrom!
+          : owners.first.id;
       final toId = currentToIsValid && _toOwnerId != fromId
           ? _toOwnerId
           : owners.any(
-        (owner) => owner.id == rememberedTo && owner.id != fromId,
-      )
-              ? rememberedTo
-              : owners.where((owner) => owner.id != fromId).first.id;
+              (owner) => owner.id == rememberedTo && owner.id != fromId,
+            )
+          ? rememberedTo
+          : owners.where((owner) => owner.id != fromId).first.id;
 
       setState(() {
         _fromOwnerId = fromId;

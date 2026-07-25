@@ -5,10 +5,7 @@ import '../../../../shared/models/transfer.dart';
 import '../../application/transfer_providers.dart';
 
 class DeleteTransferDialog extends ConsumerStatefulWidget {
-  const DeleteTransferDialog({
-    required this.transfer,
-    super.key,
-  });
+  const DeleteTransferDialog({required this.transfer, super.key});
 
   final Transfer transfer;
 
@@ -66,7 +63,9 @@ class _DeleteTransferDialogState extends ConsumerState<DeleteTransferDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not archive transfer. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not archive transfer. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

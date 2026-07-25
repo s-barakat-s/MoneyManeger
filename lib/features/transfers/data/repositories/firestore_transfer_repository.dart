@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../shared/models/transfer.dart';
 import '../../domain/repositories/transfer_repository.dart';
@@ -7,21 +6,16 @@ import '../../domain/repositories/transfer_repository.dart';
 class FirestoreTransferRepository implements TransferRepository {
   const FirestoreTransferRepository({
     required FirebaseFirestore firestore,
-    required FirebaseAuth auth,
+    required String uid,
   }) : _firestore = firestore,
-       _auth = auth;
+       _uid = uid;
 
   final FirebaseFirestore _firestore;
-  final FirebaseAuth _auth;
+  final String _uid;
 
   @override
   Stream<List<Transfer>> watchTransfers() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _transfersCollection(userId)
+    return _transfersCollection(_uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map(
@@ -34,12 +28,7 @@ class FirestoreTransferRepository implements TransferRepository {
 
   @override
   Stream<List<Transfer>> watchTransfersByOwner(String ownerId) {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _transfersCollection(userId)
+    return _transfersCollection(_uid)
         .orderBy('date', descending: true)
         .snapshots()
         .map(
@@ -111,22 +100,13 @@ class FirestoreTransferRepository implements TransferRepository {
   }
 
   CollectionReference<Map<String, dynamic>> _currentTransfersCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
-    return _transfersCollection(userId);
+    return _transfersCollection(_uid);
   }
 
   CollectionReference<Map<String, dynamic>> _transfersCollection(
     String userId,
   ) {
     return _firestore.collection('users').doc(userId).collection('transfers');
-  }
-
-  String? _currentUserIdOrNull() {
-    return _auth.currentUser?.uid;
   }
 
   Transfer _transferFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {

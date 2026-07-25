@@ -39,7 +39,9 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
               TextFormField(
                 controller: _nameController,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Money Holder name'),
+                decoration: const InputDecoration(
+                  labelText: 'Money Holder name',
+                ),
                 textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -96,7 +98,9 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not save owner. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not save owner. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

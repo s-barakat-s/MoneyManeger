@@ -8,11 +8,7 @@ abstract final class HomeSummaryHeroTags {
 }
 
 class HomeSummaryHero extends StatelessWidget {
-  const HomeSummaryHero({
-    required this.tag,
-    required this.child,
-    super.key,
-  });
+  const HomeSummaryHero({required this.tag, required this.child, super.key});
 
   final String tag;
   final Widget child;
@@ -22,10 +18,8 @@ class HomeSummaryHero extends StatelessWidget {
     return Hero(
       tag: tag,
       transitionOnUserGestures: true,
-      createRectTween: (begin, end) => MaterialRectArcTween(
-        begin: begin,
-        end: end,
-      ),
+      createRectTween: (begin, end) =>
+          MaterialRectArcTween(begin: begin, end: end),
       child: child,
     );
   }

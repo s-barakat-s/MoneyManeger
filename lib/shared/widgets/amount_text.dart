@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 
-enum AmountTextVariant {
-  income,
-  expense,
-  neutral,
-}
+enum AmountTextVariant { income, expense, neutral }
 
 class AmountText extends StatelessWidget {
   const AmountText({
@@ -26,9 +22,9 @@ class AmountText extends StatelessWidget {
     return Text(
       amountText ?? formatEgpCurrency(amount!),
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: _color(context),
-            fontWeight: FontWeight.w800,
-          ),
+        color: _color(context),
+        fontWeight: FontWeight.w800,
+      ),
     );
   }
 

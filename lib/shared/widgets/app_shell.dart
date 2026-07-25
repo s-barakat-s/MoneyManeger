@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +9,7 @@ import '../../core/services/app_update_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../navigation/root_back_exit.dart';
 import 'bottom_nav_spacer.dart';
 import 'responsive_dialog_content.dart';
 
@@ -43,9 +43,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   AppUpdateInfo? _pendingUpdateInfo;
   Timer? _displayRetryTimer;
-  Timer? _exitResetTimer;
   int _displayRetryCount = 0;
-  bool _exitArmed = false;
 
   @override
   void initState() {
@@ -58,42 +56,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void dispose() {
     _displayRetryTimer?.cancel();
-    _exitResetTimer?.cancel();
     super.dispose();
-  }
-
-  void _handleBack(bool didPop) {
-    if (didPop) {
-      return;
-    }
-
-    if (!_routeMatches(widget.currentLocation, AppRoute.dashboard)) {
-      context.go(AppRoute.dashboard.path);
-      return;
-    }
-
-    if (_exitArmed) {
-      SystemNavigator.pop();
-      return;
-    }
-
-    _exitResetTimer?.cancel();
-    setState(() {
-      _exitArmed = true;
-    });
-    _exitResetTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _exitArmed = false;
-        });
-      }
-    });
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Press back again to exit')),
-      );
   }
 
   Future<void> _checkForAppUpdate() async {
@@ -104,8 +67,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     _didCheckForUpdate = true;
     _isUpdateCheckRunning = true;
     try {
-      final updateInfo =
-          await ref.read(appUpdateServiceProvider).checkForUpdate();
+      final updateInfo = await ref
+          .read(appUpdateServiceProvider)
+          .checkForUpdate();
       if (!mounted || updateInfo == null) {
         return;
       }
@@ -168,13 +132,20 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     final routerCanPop = GoRouter.of(context).canPop();
-    return PopScope(
-      canPop: routerCanPop,
-      onPopInvokedWithResult: (didPop, result) => _handleBack(didPop),
+    final isDashboard = _routeMatches(
+      widget.currentLocation,
+      AppRoute.dashboard,
+    );
+    return RootBackExitScope(
+      canPopNormally: routerCanPop,
+      isTrueRoot: isDashboard && !routerCanPop,
+      resetToken: widget.currentLocation,
+      onLogicalBack: isDashboard
+          ? null
+          : () => context.go(AppRoute.dashboard.path),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isDesktop =
-              constraints.maxWidth >= AppShell._desktopBreakpoint;
+          final isDesktop = constraints.maxWidth >= AppShell._desktopBreakpoint;
 
           if (isDesktop) {
             return Scaffold(
@@ -215,7 +186,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
-                  bottom: MediaQuery.paddingOf(context).bottom +
+                  bottom:
+                      MediaQuery.paddingOf(context).bottom +
                       AppBottomNavSpacer.navigationBarBottomMargin,
                   child: _MobileBottomNav(
                     currentLocation: widget.currentLocation,
@@ -232,10 +204,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 }
 
 class _AppUpdateDialog extends StatefulWidget {
-  const _AppUpdateDialog({
-    required this.updateInfo,
-    required this.onDownload,
-  });
+  const _AppUpdateDialog({required this.updateInfo, required this.onDownload});
 
   final AppUpdateInfo updateInfo;
   final Future<bool> Function() onDownload;
@@ -267,9 +236,7 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
 
     if (!opened) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر فتح رابط التحديث. حاول مرة أخرى.'),
-        ),
+        const SnackBar(content: Text('تعذر فتح رابط التحديث. حاول مرة أخرى.')),
       );
       return;
     }
@@ -351,11 +318,7 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
 }
 
 class _MainContent extends StatelessWidget {
-  const _MainContent({
-    required this.child,
-    required this.padding,
-    this.title,
-  });
+  const _MainContent({required this.child, required this.padding, this.title});
 
   final Widget child;
   final double padding;
@@ -382,10 +345,7 @@ class _MainContent extends StatelessWidget {
 }
 
 class AppSidebar extends StatelessWidget {
-  const AppSidebar({
-    required this.currentLocation,
-    super.key,
-  });
+  const AppSidebar({required this.currentLocation, super.key});
 
   final String currentLocation;
 
@@ -616,10 +576,9 @@ class _BottomNavItem extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: foreground,
-                        fontWeight:
-                            isSelected ? FontWeight.w800 : FontWeight.w600,
-                      ),
+                    color: foreground,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -639,43 +598,38 @@ class _CenterQuickAddButton extends StatefulWidget {
 
 class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
   final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
+  bool _isPopoverOpen = false;
 
-  @override
-  void dispose() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    super.dispose();
-  }
-
-  void _togglePopover() {
-    if (_overlayEntry != null) {
+  Future<void> _togglePopover() async {
+    if (_isPopoverOpen) {
       _hidePopover();
       return;
     }
 
     final router = GoRouter.of(context);
-    _overlayEntry = OverlayEntry(
-      builder: (context) => _QuickAddOverlay(
-        layerLink: _layerLink,
-        onDismiss: _hidePopover,
-        onActionSelected: (action) {
-          _hidePopover();
-          _goQuickAdd(router, action);
-        },
-      ),
+    setState(() => _isPopoverOpen = true);
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss Quick Add',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+          _QuickAddOverlay(
+            layerLink: _layerLink,
+            onDismiss: () => Navigator.of(dialogContext).pop(),
+            onActionSelected: (action) {
+              Navigator.of(dialogContext).pop();
+              _goQuickAdd(router, action);
+            },
+          ),
     );
-    Overlay.of(context).insert(_overlayEntry!);
-    setState(() {});
+    if (mounted) setState(() => _isPopoverOpen = false);
   }
 
   void _hidePopover() {
-    final hadPopover = _overlayEntry != null;
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (hadPopover && mounted) {
-      setState(() {});
-    }
+    if (!_isPopoverOpen) return;
+    Navigator.of(context, rootNavigator: true).maybePop();
   }
 
   @override
@@ -709,7 +663,7 @@ class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
                 width: 64,
                 height: 64,
                 child: AnimatedRotation(
-                  turns: _overlayEntry == null ? 0 : 0.125,
+                  turns: _isPopoverOpen ? 0.125 : 0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
                   child: const Icon(
@@ -731,10 +685,7 @@ void _goQuickAdd(GoRouter router, _QuickAddAction action) {
   final trigger = DateTime.now().microsecondsSinceEpoch.toString();
   final location = Uri(
     path: action.route.path,
-    queryParameters: {
-      'quickAdd': action.quickAdd,
-      'trigger': trigger,
-    },
+    queryParameters: {'quickAdd': action.quickAdd, 'trigger': trigger},
   ).toString();
 
   router.go(location);
@@ -833,9 +784,11 @@ class _QuickAddPopover extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        for (var index = 0;
-                            index < _quickAddActions.length;
-                            index++) ...[
+                        for (
+                          var index = 0;
+                          index < _quickAddActions.length;
+                          index++
+                        ) ...[
                           _QuickAddTile(
                             action: _quickAddActions[index],
                             onSelected: onActionSelected,
@@ -858,10 +811,7 @@ class _QuickAddPopover extends StatelessWidget {
 }
 
 class _QuickAddTile extends StatelessWidget {
-  const _QuickAddTile({
-    required this.action,
-    required this.onSelected,
-  });
+  const _QuickAddTile({required this.action, required this.onSelected});
 
   final _QuickAddAction action;
   final ValueChanged<_QuickAddAction> onSelected;
@@ -896,16 +846,16 @@ class _QuickAddTile extends StatelessWidget {
                     Text(
                       action.title,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       action.subtitle,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -1089,9 +1039,7 @@ const _primaryMobileDestinations = [
   ),
 ];
 
-const _mobileDestinations = [
-  ..._primaryMobileDestinations,
-];
+const _mobileDestinations = [..._primaryMobileDestinations];
 
 bool _isHomeSection(String location) {
   return _routeMatches(location, AppRoute.dashboard) ||
@@ -1100,14 +1048,9 @@ bool _isHomeSection(String location) {
       _routeMatches(location, AppRoute.receivables) ||
       _routeMatches(location, AppRoute.companyAssets);
 }
- 
+
 class _AppDestination {
-  const _AppDestination(
-    this.label,
-    this.icon,
-    this.route, {
-    this.selectedIcon,
-  });
+  const _AppDestination(this.label, this.icon, this.route, {this.selectedIcon});
 
   final String label;
   final IconData icon;

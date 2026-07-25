@@ -80,85 +80,88 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
         child: DefaultTabController(
           length: 2,
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PageHeader(
-              title: 'Receivables',
-              actionLabel: 'Add receivable',
-              onAction: () => _showAddDialog(context),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            summaryAsync.when(
-              data: (summary) => _SummaryCard(
-                label: 'Total receivables',
-                value: formatEgpCurrency(summary.remaining),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PageHeader(
+                title: 'Receivables',
+                actionLabel: 'Add receivable',
+                onAction: () => _showAddDialog(context),
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (error, stackTrace) => const ErrorState(
-                title: 'Receivables summary unavailable',
-                message: 'We could not load your receivables summary right now.',
+              const SizedBox(height: AppSpacing.md),
+              summaryAsync.when(
+                data: (summary) => _SummaryCard(
+                  label: 'Total receivables',
+                  value: formatEgpCurrency(summary.remaining),
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (error, stackTrace) => const ErrorState(
+                  title: 'Receivables summary unavailable',
+                  message:
+                      'We could not load your receivables summary right now.',
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AppSearchFilterBar(
-              controller: _searchController,
-              hintText: 'Search receivables',
-              filtersActive: _hasPanelFilters,
-              onFilterTap: _showFilterSheet,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TabBar(
-              dividerColor: Theme.of(context).colorScheme.outline,
-              indicatorColor: AppColors.primary,
-              labelColor: AppColors.primary,
-              unselectedLabelColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
-              tabs: const [
-                Tab(text: 'Active'),
-                Tab(text: 'Archived'),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  activeReceivablesAsync.when(
-                    data: (receivables) => _ReceivablesList(
-                      receivables: receivables,
-                      searchText: _searchText,
-                      statusFilter: _statusFilter,
-                      onClearFilters: _clearAllFilters,
-                      emptyTitle: 'No active receivables',
-                      emptyDescription:
-                          'Money owed to your business will appear here once added.',
-                    ),
-                    loading: () => const LoadingSkeleton(itemCount: 4),
-                    error: (error, stackTrace) => const ErrorState(
-                      title: 'Receivables unavailable',
-                      message: 'We could not load active receivables right now.',
-                    ),
-                  ),
-                  archivedReceivablesAsync.when(
-                    data: (receivables) => _ReceivablesList(
-                      receivables: receivables,
-                      searchText: _searchText,
-                      statusFilter: _statusFilter,
-                      onClearFilters: _clearAllFilters,
-                      emptyTitle: 'No archived receivables',
-                      emptyDescription:
-                          'Archived receivables will appear here when you archive them.',
-                    ),
-                    loading: () => const LoadingSkeleton(itemCount: 4),
-                    error: (error, stackTrace) => const ErrorState(
-                      title: 'Archived receivables unavailable',
-                      message:
-                          'We could not load archived receivables right now.',
-                    ),
-                  ),
+              const SizedBox(height: AppSpacing.lg),
+              AppSearchFilterBar(
+                controller: _searchController,
+                hintText: 'Search receivables',
+                filtersActive: _hasPanelFilters,
+                onFilterTap: _showFilterSheet,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TabBar(
+                dividerColor: Theme.of(context).colorScheme.outline,
+                indicatorColor: AppColors.primary,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant,
+                tabs: const [
+                  Tab(text: 'Active'),
+                  Tab(text: 'Archived'),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    activeReceivablesAsync.when(
+                      data: (receivables) => _ReceivablesList(
+                        receivables: receivables,
+                        searchText: _searchText,
+                        statusFilter: _statusFilter,
+                        onClearFilters: _clearAllFilters,
+                        emptyTitle: 'No active receivables',
+                        emptyDescription:
+                            'Money owed to your business will appear here once added.',
+                      ),
+                      loading: () => const LoadingSkeleton(itemCount: 4),
+                      error: (error, stackTrace) => const ErrorState(
+                        title: 'Receivables unavailable',
+                        message:
+                            'We could not load active receivables right now.',
+                      ),
+                    ),
+                    archivedReceivablesAsync.when(
+                      data: (receivables) => _ReceivablesList(
+                        receivables: receivables,
+                        searchText: _searchText,
+                        statusFilter: _statusFilter,
+                        onClearFilters: _clearAllFilters,
+                        emptyTitle: 'No archived receivables',
+                        emptyDescription:
+                            'Archived receivables will appear here when you archive them.',
+                      ),
+                      loading: () => const LoadingSkeleton(itemCount: 4),
+                      error: (error, stackTrace) => const ErrorState(
+                        title: 'Archived receivables unavailable',
+                        message:
+                            'We could not load archived receivables right now.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -232,10 +235,7 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-  });
+  const _SummaryCard({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -254,7 +254,10 @@ class _SummaryCard extends StatelessWidget {
               children: [
                 Text(label, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: AppSpacing.xs),
-                AmountText(amountText: value, variant: AmountTextVariant.income),
+                AmountText(
+                  amountText: value,
+                  variant: AmountTextVariant.income,
+                ),
               ],
             ),
           ),
@@ -284,24 +287,25 @@ class _ReceivablesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalizedSearch = searchText.trim().toLowerCase();
-    final hasActiveFilters = normalizedSearch.isNotEmpty ||
+    final hasActiveFilters =
+        normalizedSearch.isNotEmpty ||
         statusFilter != _ReceivableStatusFilter.all;
     final visibleReceivables = receivables.where((receivable) {
       final remainingAmount = (receivable.totalAmount - receivable.paidAmount)
           .clamp(0, double.infinity)
           .toDouble();
       final note = receivable.note?.trim() ?? '';
-      final matchesSearch = normalizedSearch.isEmpty ||
+      final matchesSearch =
+          normalizedSearch.isEmpty ||
           receivable.personName.toLowerCase().contains(normalizedSearch) ||
           note.toLowerCase().contains(normalizedSearch) ||
-          formatEgpCurrency(receivable.totalAmount)
-              .toLowerCase()
-              .contains(normalizedSearch) ||
-          formatEgpCurrency(remainingAmount)
-              .toLowerCase()
-              .contains(normalizedSearch);
-      final matchesStatus =
-          _matchesReceivableStatus(receivable, statusFilter);
+          formatEgpCurrency(
+            receivable.totalAmount,
+          ).toLowerCase().contains(normalizedSearch) ||
+          formatEgpCurrency(
+            remainingAmount,
+          ).toLowerCase().contains(normalizedSearch);
+      final matchesStatus = _matchesReceivableStatus(receivable, statusFilter);
 
       return matchesSearch && matchesStatus;
     }).toList();
@@ -332,7 +336,8 @@ class _ReceivablesList extends StatelessWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleReceivables.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) =>
           _ReceivableListItem(receivable: visibleReceivables[index]),
     );
@@ -453,20 +458,17 @@ class _ReceivableListItem extends ConsumerWidget {
                 onArchive: () => _showDeleteDialog(context, receivable),
                 onMarkCollected: remainingAmount > 0
                     ? () => _showCollectionDialog(
-                          context,
-                          receivable,
-                          remainingAmount,
-                          prefillAmount: remainingAmount,
-                        )
+                        context,
+                        receivable,
+                        remainingAmount,
+                        prefillAmount: remainingAmount,
+                      )
                     : null,
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Remaining',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('Remaining', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSpacing.xs),
           AmountText(
             amountText: formatEgpCurrency(remainingAmount),
@@ -486,7 +488,10 @@ class _ReceivableListItem extends ConsumerWidget {
                 value: formatEgpCurrency(receivable.paidAmount),
               ),
               if (receivable.dueDate != null)
-                _MetaText(label: 'Due', value: _formatDate(receivable.dueDate!)),
+                _MetaText(
+                  label: 'Due',
+                  value: _formatDate(receivable.dueDate!),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -509,10 +514,10 @@ class _ReceivableListItem extends ConsumerWidget {
             FilledButton.icon(
               onPressed: remainingAmount > 0
                   ? () => _showCollectionDialog(
-                        context,
-                        receivable,
-                        remainingAmount,
-                      )
+                      context,
+                      receivable,
+                      remainingAmount,
+                    )
                   : null,
               icon: const Icon(Icons.payments_outlined),
               label: const Text('Collect'),
@@ -621,12 +626,21 @@ class _ReceivableListItem extends ConsumerWidget {
                 label: 'Status',
                 value: _statusFor(context, receivable, remainingAmount).label,
               ),
-              _MetaText(label: 'Created', value: _formatDate(receivable.createdAt)),
+              _MetaText(
+                label: 'Created',
+                value: _formatDate(receivable.createdAt),
+              ),
               if (receivable.dueDate != null)
-                _MetaText(label: 'Due', value: _formatDate(receivable.dueDate!)),
+                _MetaText(
+                  label: 'Due',
+                  value: _formatDate(receivable.dueDate!),
+                ),
               if (receivable.note != null && receivable.note!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
-                Text(receivable.note!, style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  receivable.note!,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ],
             ],
           ),
@@ -666,10 +680,7 @@ class _ReceivableMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: _ReceivableAction.edit,
-          child: Text('Edit'),
-        ),
+        const PopupMenuItem(value: _ReceivableAction.edit, child: Text('Edit')),
         if (canArchive)
           const PopupMenuItem(
             value: _ReceivableAction.archive,
@@ -709,10 +720,7 @@ class _ReceivableIcon extends StatelessWidget {
 }
 
 class _MetaText extends StatelessWidget {
-  const _MetaText({
-    required this.label,
-    required this.value,
-  });
+  const _MetaText({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -748,9 +756,9 @@ class _StatusBadge extends StatelessWidget {
         child: Text(
           status.label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: status.color,
-                fontWeight: FontWeight.w800,
-              ),
+            color: status.color,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

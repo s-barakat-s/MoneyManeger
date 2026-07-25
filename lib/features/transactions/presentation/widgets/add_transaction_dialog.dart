@@ -106,22 +106,21 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
     try {
       await ref.read(createTransactionProvider)(
-            money.Transaction(
-              id: '',
-              ownerId: _ownerId!,
-              type: _type,
-              amount: double.parse(_amountController.text.trim()),
-              date: _date,
-              note: _noteController.text.trim().isEmpty
-                  ? null
-                  : _noteController.text.trim(),
-            ),
-          );
+        money.Transaction(
+          id: '',
+          ownerId: _ownerId!,
+          type: _type,
+          amount: double.parse(_amountController.text.trim()),
+          date: _date,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+        ),
+      );
 
-      await ref.read(lastUsedSelectionProvider).save(
-            _selectionPreference,
-            _ownerId!,
-          );
+      await ref
+          .read(lastUsedSelectionProvider)
+          .save(_selectionPreference, _ownerId!);
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -155,8 +154,8 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
   LastUsedOwnerSelection get _selectionPreference =>
       _type == money.TransactionType.income
-          ? LastUsedOwnerSelection.income
-          : LastUsedOwnerSelection.expense;
+      ? LastUsedOwnerSelection.income
+      : LastUsedOwnerSelection.expense;
 
   void _initializeOwner(List<Owner> owners) {
     if (owners.isEmpty || _initializedOwnerType == _type) {
@@ -169,8 +168,9 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
       final selection = initializingType == money.TransactionType.income
           ? LastUsedOwnerSelection.income
           : LastUsedOwnerSelection.expense;
-      final remembered =
-          await ref.read(lastUsedSelectionProvider).read(selection);
+      final remembered = await ref
+          .read(lastUsedSelectionProvider)
+          .read(selection);
       if (!mounted || _type != initializingType || _ownerId != null) {
         return;
       }

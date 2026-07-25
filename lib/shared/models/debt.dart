@@ -11,11 +11,7 @@ enum DebtType {
   owedToUs,
 }
 
-enum DebtStatus {
-  active,
-  paid,
-  archived,
-}
+enum DebtStatus { active, paid, archived }
 
 /// A debt record tracked against an external person.
 @freezed

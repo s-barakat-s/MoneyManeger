@@ -8,10 +8,7 @@ import '../../application/company_asset_providers.dart';
 import '../asset_category_label.dart';
 
 class AssetFormDialog extends ConsumerStatefulWidget {
-  const AssetFormDialog({
-    this.asset,
-    super.key,
-  });
+  const AssetFormDialog({this.asset, super.key});
 
   final CompanyAsset? asset;
 
@@ -187,7 +184,9 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Could not save asset. Please try again.');
+        setState(
+          () => _errorMessage = 'Could not save asset. Please try again.',
+        );
       }
     } finally {
       if (mounted) {

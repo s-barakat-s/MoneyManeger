@@ -22,10 +22,7 @@ import 'widgets/asset_form_dialog.dart';
 import 'widgets/delete_asset_dialog.dart';
 
 class CompanyAssetsPage extends ConsumerStatefulWidget {
-  const CompanyAssetsPage({
-    required this.currentLocation,
-    super.key,
-  });
+  const CompanyAssetsPage({required this.currentLocation, super.key});
 
   final String currentLocation;
 
@@ -66,44 +63,44 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          PageHeader(
-            title: 'Assets',
-            actionLabel: 'Add asset',
-            onAction: () => _showAddDialog(context),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          totalAsync.when(
-            data: (total) => _SummaryCard(value: formatEgpCurrency(total)),
-            loading: () => const LinearProgressIndicator(),
-            error: (error, stackTrace) => const ErrorState(
-              title: 'Assets summary unavailable',
-              message: 'We could not load your assets summary right now.',
+            PageHeader(
+              title: 'Assets',
+              actionLabel: 'Add asset',
+              onAction: () => _showAddDialog(context),
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          AppSearchFilterBar(
-            controller: _searchController,
-            hintText: 'Search assets',
-            filtersActive: _hasPanelFilters,
-            onFilterTap: _showFilterSheet,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: assetsAsync.when(
-              data: (assets) => _AssetsList(
-                assets: assets,
-                searchText: _searchText,
-                selectedCategory: _selectedCategory,
-                onClearFilters: _clearAllFilters,
-                onAdd: () => _showAddDialog(context),
-              ),
-              loading: () => const LoadingSkeleton(itemCount: 4),
+            const SizedBox(height: AppSpacing.md),
+            totalAsync.when(
+              data: (total) => _SummaryCard(value: formatEgpCurrency(total)),
+              loading: () => const LinearProgressIndicator(),
               error: (error, stackTrace) => const ErrorState(
-                title: 'Assets unavailable',
-                message: 'We could not load company assets right now.',
+                title: 'Assets summary unavailable',
+                message: 'We could not load your assets summary right now.',
               ),
             ),
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            AppSearchFilterBar(
+              controller: _searchController,
+              hintText: 'Search assets',
+              filtersActive: _hasPanelFilters,
+              onFilterTap: _showFilterSheet,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: assetsAsync.when(
+                data: (assets) => _AssetsList(
+                  assets: assets,
+                  searchText: _searchText,
+                  selectedCategory: _selectedCategory,
+                  onClearFilters: _clearAllFilters,
+                  onAdd: () => _showAddDialog(context),
+                ),
+                loading: () => const LoadingSkeleton(itemCount: 4),
+                error: (error, stackTrace) => const ErrorState(
+                  title: 'Assets unavailable',
+                  message: 'We could not load company assets right now.',
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -187,8 +184,8 @@ class _SummaryCard extends StatelessWidget {
                 Text(
                   'Company assets value',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -221,13 +218,14 @@ class _AssetsList extends StatelessWidget {
         normalizedSearch.isNotEmpty || selectedCategory != null;
     final visibleAssets = assets.where((asset) {
       final note = asset.note?.trim() ?? '';
-      final matchesSearch = normalizedSearch.isEmpty ||
+      final matchesSearch =
+          normalizedSearch.isEmpty ||
           asset.name.toLowerCase().contains(normalizedSearch) ||
           asset.category.label.toLowerCase().contains(normalizedSearch) ||
           note.toLowerCase().contains(normalizedSearch) ||
-          formatEgpCurrency(asset.purchasePrice)
-              .toLowerCase()
-              .contains(normalizedSearch);
+          formatEgpCurrency(
+            asset.purchasePrice,
+          ).toLowerCase().contains(normalizedSearch);
       final matchesCategory =
           selectedCategory == null || asset.category == selectedCategory;
 
@@ -266,8 +264,10 @@ class _AssetsList extends StatelessWidget {
     return ListView.separated(
       padding: AppBottomNavSpacer.listPadding(context),
       itemCount: visibleAssets.length,
-      separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) => _AssetListItem(asset: visibleAssets[index]),
+      separatorBuilder: (context, index) =>
+          const SizedBox(height: AppSpacing.md),
+      itemBuilder: (context, index) =>
+          _AssetListItem(asset: visibleAssets[index]),
     );
   }
 }
@@ -356,8 +356,8 @@ class _AssetListItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     _CategoryBadge(label: asset.category.label),
@@ -372,10 +372,7 @@ class _AssetListItem extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Purchase value',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text('Purchase value', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSpacing.xs),
           AmountText(amountText: formatEgpCurrency(asset.purchasePrice)),
           const SizedBox(height: AppSpacing.md),
@@ -436,10 +433,7 @@ class _AssetListItem extends StatelessWidget {
 }
 
 class _AssetMenu extends StatelessWidget {
-  const _AssetMenu({
-    required this.onEdit,
-    required this.onArchive,
-  });
+  const _AssetMenu({required this.onEdit, required this.onArchive});
 
   final VoidCallback onEdit;
   final VoidCallback onArchive;
@@ -457,10 +451,7 @@ class _AssetMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: _AssetAction.edit,
-          child: Text('Edit'),
-        ),
+        PopupMenuItem(value: _AssetAction.edit, child: Text('Edit')),
         PopupMenuItem(
           value: _AssetAction.archive,
           child: Text('Archive asset'),
@@ -513,9 +504,9 @@ class _CategoryBadge extends StatelessWidget {
         child: Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.primaryDark,
-                fontWeight: FontWeight.w800,
-              ),
+            color: AppColors.primaryDark,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -523,10 +514,7 @@ class _CategoryBadge extends StatelessWidget {
 }
 
 class _MetaText extends StatelessWidget {
-  const _MetaText({
-    required this.label,
-    required this.value,
-  });
+  const _MetaText({required this.label, required this.value});
 
   final String label;
   final String value;
