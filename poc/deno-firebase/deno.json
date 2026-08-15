@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "firebase-admin/app": "npm:firebase-admin@13.10.0/app",
+    "firebase-admin/auth": "npm:firebase-admin@13.10.0/auth",
+    "firebase-admin/firestore": "npm:firebase-admin@13.10.0/firestore"
+  },
+  "tasks": {
+    "check": "deno check main.ts",
+    "start": "deno run --allow-env --allow-net main.ts"
+  }
+}

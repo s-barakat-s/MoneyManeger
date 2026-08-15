@@ -8,8 +8,18 @@ final debtsStreamProvider = StreamProvider.autoDispose<List<Debt>>((ref) {
   return ref.watch(debtRepositoryProvider).watchDebts();
 });
 
+final weOweDebtsStreamProvider = StreamProvider.autoDispose<List<Debt>>((ref) {
+  return ref.watch(debtRepositoryProvider).watchDebtsByType(DebtType.weOwe);
+});
+
+final owedToUsDebtsStreamProvider = StreamProvider.autoDispose<List<Debt>>((ref) {
+  return ref
+      .watch(debtRepositoryProvider)
+      .watchDebtsByType(DebtType.owedToUs);
+});
+
 final weOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((ref) {
-  final debts = ref.watch(debtsStreamProvider);
+  final debts = ref.watch(weOweDebtsStreamProvider);
 
   return debts.whenData(
     (value) => value
@@ -23,7 +33,7 @@ final weOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((ref) {
 
 final archivedWeOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>(
   (ref) {
-    final debts = ref.watch(debtsStreamProvider);
+    final debts = ref.watch(weOweDebtsStreamProvider);
 
     return debts.whenData(
       (value) => value
@@ -39,7 +49,7 @@ final archivedWeOweDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>(
 final owedToUsDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((
   ref,
 ) {
-  final debts = ref.watch(debtsStreamProvider);
+  final debts = ref.watch(owedToUsDebtsStreamProvider);
 
   return debts.whenData(
     (value) => value
@@ -54,7 +64,7 @@ final owedToUsDebtsProvider = Provider.autoDispose<AsyncValue<List<Debt>>>((
 
 final archivedOwedToUsDebtsProvider =
     Provider.autoDispose<AsyncValue<List<Debt>>>((ref) {
-      final debts = ref.watch(debtsStreamProvider);
+      final debts = ref.watch(owedToUsDebtsStreamProvider);
 
       return debts.whenData(
         (value) => value

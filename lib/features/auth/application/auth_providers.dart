@@ -1,9 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/actor_identity.dart';
 import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/data/firestore_paths.dart';
 import '../data/auth_service.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -42,33 +43,38 @@ final currentUidProvider = Provider<String?>((ref) {
   return authState is AsyncData<User?> ? authState.value?.uid : null;
 });
 
+final authenticatedActorUidProvider = Provider<String>((ref) {
+  return requireAuthenticatedActorUid(ref.watch(currentUidProvider));
+});
+
 class AppUserProfile {
-  const AppUserProfile({required this.username});
+  const AppUserProfile({required this.username, this.activeBusinessId});
 
   final String? username;
+  final String? activeBusinessId;
 }
 
 final userProfileProvider = StreamProvider.autoDispose
     .family<AppUserProfile, String>((ref, uid) {
-      return ref
-          .watch(firebaseFirestoreProvider)
-          .collection('users')
-          .doc(uid)
-          .snapshots()
-          .map((snapshot) {
-            final rawUsername = snapshot.data()?['username'];
-            final username = rawUsername is String ? rawUsername.trim() : null;
-            return AppUserProfile(
-              username: username == null || username.isEmpty ? null : username,
-            );
-          });
+      return FirestorePaths.userProfile(
+        ref.watch(firebaseFirestoreProvider),
+        uid,
+      ).snapshots().map((snapshot) {
+        final rawUsername = snapshot.data()?['username'];
+        final username = rawUsername is String ? rawUsername.trim() : null;
+        return AppUserProfile(
+          username: username == null || username.isEmpty ? null : username,
+          activeBusinessId: snapshot.data()?['activeBusinessId'] as String?,
+        );
+      });
     });
 
 final userProfileStatusProvider = StreamProvider.autoDispose
     .family<UserProfileStatus, String>((ref, uid) {
-      return FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
+      return FirestorePaths.userProfile(
+            ref.watch(firebaseFirestoreProvider),
+            uid,
+          )
           .snapshots()
           .map((snapshot) {
             final data = snapshot.data();

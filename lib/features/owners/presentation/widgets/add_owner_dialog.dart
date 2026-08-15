@@ -87,7 +87,6 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
     final owner = Owner(
       id: '',
       name: _nameController.text.trim(),
-      createdAt: DateTime.now(),
     );
 
     try {

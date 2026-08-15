@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../data/firestore_paths.dart';
 import '../theme/app_spacing.dart';
 
 class FirebaseRuntimeDiagnosticsPanel extends StatefulWidget {
@@ -18,7 +19,6 @@ class _FirebaseRuntimeDiagnosticsPanelState
     extends State<FirebaseRuntimeDiagnosticsPanel> {
   bool _isChecking = false;
   String? _checkResult;
-  DateTime? _lastSuccessfulServerWrite;
   DateTime? _lastSuccessfulServerRead;
 
   @override
@@ -62,10 +62,6 @@ class _FirebaseRuntimeDiagnosticsPanelState
               value: 'Persistent Firestore cache disabled',
             ),
             _DiagnosticRow(
-              label: 'server write',
-              value: _formatDateTime(_lastSuccessfulServerWrite),
-            ),
-            _DiagnosticRow(
               label: 'server read',
               value: _formatDateTime(_lastSuccessfulServerRead),
             ),
@@ -83,8 +79,7 @@ class _FirebaseRuntimeDiagnosticsPanelState
             if (uid == null) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Sign in or protect an anonymous user to test '
-                'users/{uid}/_debug/runtime_check.',
+                'Sign in to test a server read of your user profile.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -117,29 +112,17 @@ class _FirebaseRuntimeDiagnosticsPanelState
     });
 
     try {
-      final doc = FirebaseFirestore.instanceFor(
-        app: app,
-      ).collection('users').doc(uid).collection('_debug').doc('runtime_check');
-
-      await doc.set({
-        'projectId': app.options.projectId,
-        'appId': app.options.appId,
-        'uid': uid,
-        'isAnonymous': user?.isAnonymous,
-        'email': user?.email,
-        'checkedAt': FieldValue.serverTimestamp(),
-        'checkedAtLocal': DateTime.now().toIso8601String(),
-      }, SetOptions(merge: true));
-
-      final writeFinishedAt = DateTime.now();
+      final doc = FirestorePaths.userProfile(
+        FirebaseFirestore.instanceFor(app: app),
+        uid,
+      );
       final snapshot = await doc.get(const GetOptions(source: Source.server));
 
       setState(() {
         _checkResult = snapshot.exists
-            ? 'Server read/write OK at users/$uid/_debug/runtime_check'
-            : 'Write finished, but the server read did not find the document.';
+            ? 'Server read OK at userProfiles/$uid'
+            : 'The server read succeeded, but the profile does not exist.';
         if (snapshot.exists) {
-          _lastSuccessfulServerWrite = writeFinishedAt;
           _lastSuccessfulServerRead = DateTime.now();
         }
       });
@@ -169,7 +152,7 @@ class _FirebaseRuntimeDiagnosticsPanelState
 
     return switch (error.code) {
       'permission-denied' =>
-        'Firestore check failed: permission denied. Check Firestore rules for users/{uid}.',
+        'Firestore check failed: permission denied. Check userProfiles rules.',
       'unavailable' =>
         'Firestore check failed: server unavailable or network offline.',
       'not-found' =>

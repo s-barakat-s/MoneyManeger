@@ -17,6 +17,8 @@ import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../application/debt_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import 'debt_stream_providers.dart';
 import 'widgets/add_debt_dialog.dart';
 import 'widgets/delete_debt_dialog.dart';
@@ -70,6 +72,9 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
     final activeDebtsAsync = ref.watch(weOweDebtsProvider);
     final archivedDebtsAsync = ref.watch(archivedWeOweDebtsProvider);
     final summaryAsync = ref.watch(debtSummaryProvider);
+    final canCreate = ref.watch(canProvider(Permission.debtsCreate)).value == true;
+    final canUpdate = ref.watch(canProvider(Permission.debtsUpdate)).value == true;
+    final canArchive = ref.watch(canProvider(Permission.debtsArchive)).value == true;
 
     return HomeSummaryHero(
       tag: HomeSummaryHeroTags.debts,
@@ -84,8 +89,8 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
             children: [
               PageHeader(
                 title: 'Debts',
-                actionLabel: 'Add debt',
-                onAction: () => _showAddDialog(context),
+                actionLabel: canCreate ? 'Add debt' : null,
+                onAction: canCreate ? () => _showAddDialog(context) : null,
               ),
               const SizedBox(height: AppSpacing.md),
               summaryAsync.when(
@@ -132,6 +137,8 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
                         emptyTitle: 'No active debts',
                         emptyDescription:
                             'Debts you owe will appear here once added.',
+                        canUpdate: canUpdate,
+                        canArchive: canArchive,
                       ),
                       loading: () => const LoadingSkeleton(itemCount: 4),
                       error: (error, stackTrace) => const ErrorState(
@@ -148,6 +155,8 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
                         emptyTitle: 'No archived debts',
                         emptyDescription:
                             'Archived debts will appear here when you archive them.',
+                        canUpdate: canUpdate,
+                        canArchive: canArchive,
                       ),
                       loading: () => const LoadingSkeleton(itemCount: 4),
                       error: (error, stackTrace) => const ErrorState(
@@ -183,7 +192,9 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
     _handledQuickAddTrigger = trigger;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _showAddDialog(context);
+        if (ref.read(canProvider(Permission.debtsCreate)).value == true) {
+          _showAddDialog(context);
+        }
       }
     });
   }
@@ -272,6 +283,8 @@ class _DebtsList extends StatelessWidget {
     required this.onClearFilters,
     required this.emptyTitle,
     required this.emptyDescription,
+    required this.canUpdate,
+    required this.canArchive,
   });
 
   final List<Debt> debts;
@@ -280,6 +293,8 @@ class _DebtsList extends StatelessWidget {
   final VoidCallback onClearFilters;
   final String emptyTitle;
   final String emptyDescription;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -334,7 +349,11 @@ class _DebtsList extends StatelessWidget {
       itemCount: visibleDebts.length,
       separatorBuilder: (context, index) =>
           const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) => _DebtListItem(debt: visibleDebts[index]),
+      itemBuilder: (context, index) => _DebtListItem(
+        debt: visibleDebts[index],
+        canUpdate: canUpdate,
+        canArchive: canArchive,
+      ),
     );
   }
 }
@@ -409,9 +428,15 @@ class _DebtFilterSheetState extends State<_DebtFilterSheet> {
 }
 
 class _DebtListItem extends ConsumerWidget {
-  const _DebtListItem({required this.debt});
+  const _DebtListItem({
+    required this.debt,
+    required this.canUpdate,
+    required this.canArchive,
+  });
 
   final Debt debt;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -447,19 +472,22 @@ class _DebtListItem extends ConsumerWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               _StatusBadge(status: status),
-              _DebtMenu(
-                debt: debt,
-                onEdit: () => _showEditDialog(context, debt),
-                onArchive: () => _showDeleteDialog(context, debt),
-                onMarkPaid: remainingAmount > 0
-                    ? () => _showPaymentDialog(
-                        context,
-                        debt,
-                        remainingAmount,
-                        prefillAmount: remainingAmount,
-                      )
-                    : null,
-              ),
+              if (canUpdate || canArchive)
+                _DebtMenu(
+                  debt: debt,
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
+                  onEdit: () => _showEditDialog(context, debt),
+                  onArchive: () => _showDeleteDialog(context, debt),
+                  onMarkPaid: canUpdate && remainingAmount > 0
+                      ? () => _showPaymentDialog(
+                          context,
+                          debt,
+                          remainingAmount,
+                          prefillAmount: remainingAmount,
+                        )
+                      : null,
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -502,7 +530,7 @@ class _DebtListItem extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.lg),
-          if (isActive)
+          if (isActive && canUpdate)
             FilledButton.icon(
               onPressed: remainingAmount > 0
                   ? () => _showPaymentDialog(context, debt, remainingAmount)
@@ -510,7 +538,7 @@ class _DebtListItem extends ConsumerWidget {
               icon: const Icon(Icons.payments_outlined),
               label: const Text('Pay'),
             )
-          else if (canRestore)
+          else if (canRestore && canUpdate)
             FilledButton.icon(
               onPressed: () => _restoreDebt(context, ref),
               icon: const Icon(Icons.restore),
@@ -560,8 +588,6 @@ class _DebtListItem extends ConsumerWidget {
       await ref.read(createDebtProvider)(
         debt.copyWith(
           status: DebtStatus.active,
-          archivedAt: null,
-          updatedAt: DateTime.now(),
         ),
       );
     } catch (_) {
@@ -611,7 +637,12 @@ class _DebtListItem extends ConsumerWidget {
                 label: 'Status',
                 value: _statusFor(context, debt, remainingAmount).label,
               ),
-              _MetaText(label: 'Created', value: _formatDate(debt.createdAt)),
+              _MetaText(
+                label: 'Created',
+                value: debt.audit.createdAt == null
+                    ? 'Unknown'
+                    : _formatDate(debt.audit.createdAt!),
+              ),
               if (debt.dueDate != null)
                 _MetaText(label: 'Due', value: _formatDate(debt.dueDate!)),
               if (debt.note != null && debt.note!.isNotEmpty) ...[
@@ -629,20 +660,22 @@ class _DebtListItem extends ConsumerWidget {
 class _DebtMenu extends StatelessWidget {
   const _DebtMenu({
     required this.debt,
+    required this.canUpdate,
+    required this.canArchive,
     required this.onEdit,
     required this.onArchive,
     required this.onMarkPaid,
   });
 
   final Debt debt;
+  final bool canUpdate;
+  final bool canArchive;
   final VoidCallback onEdit;
   final VoidCallback onArchive;
   final VoidCallback? onMarkPaid;
 
   @override
   Widget build(BuildContext context) {
-    final canArchive = debt.status == DebtStatus.active;
-
     return PopupMenuButton<_DebtAction>(
       tooltip: 'More actions',
       icon: const Icon(Icons.more_horiz_rounded),
@@ -656,8 +689,9 @@ class _DebtMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(value: _DebtAction.edit, child: Text('Edit')),
-        if (canArchive)
+        if (canUpdate)
+          const PopupMenuItem(value: _DebtAction.edit, child: Text('Edit')),
+        if (canArchive && debt.status == DebtStatus.active)
           const PopupMenuItem(
             value: _DebtAction.archive,
             child: Text('Archive debt'),

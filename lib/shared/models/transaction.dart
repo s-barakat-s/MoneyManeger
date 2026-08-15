@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'audit_metadata.dart';
+
 part 'transaction.freezed.dart';
 part 'transaction.g.dart';
 
@@ -16,6 +18,7 @@ abstract class Transaction with _$Transaction {
     required double amount,
     required DateTime date,
     String? note,
+    @Default(AuditMetadata()) AuditMetadata audit,
   }) = _Transaction;
 
   factory Transaction.fromJson(Map<String, dynamic> json) =>

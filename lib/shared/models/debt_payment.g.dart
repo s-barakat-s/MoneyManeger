@@ -12,6 +12,9 @@ _DebtPayment _$DebtPaymentFromJson(Map<String, dynamic> json) => _DebtPayment(
   amount: (json['amount'] as num).toDouble(),
   date: DateTime.parse(json['date'] as String),
   note: json['note'] as String?,
+  audit: json['audit'] == null
+      ? const AuditMetadata()
+      : AuditMetadata.fromJson(json['audit'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$DebtPaymentToJson(_DebtPayment instance) =>
@@ -21,4 +24,5 @@ Map<String, dynamic> _$DebtPaymentToJson(_DebtPayment instance) =>
       'amount': instance.amount,
       'date': instance.date.toIso8601String(),
       'note': instance.note,
+      'audit': instance.audit,
     };

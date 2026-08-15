@@ -15,6 +15,8 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import 'owner_stream_providers.dart';
 import 'widgets/add_owner_dialog.dart';
 import 'widgets/delete_owner_dialog.dart';
@@ -54,6 +56,9 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
   @override
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
+    final canCreate = ref.watch(canProvider(Permission.ownersCreate)).value == true;
+    final canUpdate = ref.watch(canProvider(Permission.ownersUpdate)).value == true;
+    final canArchive = ref.watch(canProvider(Permission.ownersArchive)).value == true;
 
     return HomeSummaryHero(
       tag: HomeSummaryHeroTags.owners,
@@ -66,14 +71,18 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
           children: [
             PageHeader(
               title: 'Owners / Money Holders',
-              actionLabel: 'Add holder',
+              actionLabel: canCreate ? 'Add holder' : null,
               actionIcon: Icons.add,
-              onAction: () => _showAddDialog(context),
+              onAction: canCreate ? () => _showAddDialog(context) : null,
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
               child: ownersAsync.when(
-                data: (owners) => _OwnersList(owners: owners),
+                data: (owners) => _OwnersList(
+                  owners: owners,
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
+                ),
                 loading: () => const LoadingSkeleton(itemCount: 4),
                 error: (error, stackTrace) => const ErrorState(
                   title: 'Money holders unavailable',
@@ -105,16 +114,24 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
     _handledQuickAddTrigger = trigger;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _showAddDialog(context);
+        if (ref.read(canProvider(Permission.ownersCreate)).value == true) {
+          _showAddDialog(context);
+        }
       }
     });
   }
 }
 
 class _OwnersList extends ConsumerWidget {
-  const _OwnersList({required this.owners});
+  const _OwnersList({
+    required this.owners,
+    required this.canUpdate,
+    required this.canArchive,
+  });
 
   final List<Owner> owners;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -177,7 +194,8 @@ class _OwnersList extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              PopupMenuButton<_OwnerAction>(
+              if (canUpdate || canArchive)
+                PopupMenuButton<_OwnerAction>(
                 tooltip: 'More actions',
                 icon: const Icon(Icons.more_horiz_rounded),
                 onSelected: (action) {
@@ -187,14 +205,19 @@ class _OwnersList extends ConsumerWidget {
                     _showDeleteDialog(context, owner);
                   }
                 },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: _OwnerAction.edit, child: Text('Edit')),
-                  PopupMenuItem(
-                    value: _OwnerAction.archive,
-                    child: Text('Archive'),
-                  ),
-                ],
-              ),
+                  itemBuilder: (context) => [
+                    if (canUpdate)
+                      const PopupMenuItem(
+                        value: _OwnerAction.edit,
+                        child: Text('Edit'),
+                      ),
+                    if (canArchive)
+                      const PopupMenuItem(
+                        value: _OwnerAction.archive,
+                        child: Text('Archive'),
+                      ),
+                  ],
+                ),
             ],
           ),
         );

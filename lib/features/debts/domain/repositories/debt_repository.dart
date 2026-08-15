@@ -5,6 +5,8 @@ import '../../../../shared/models/debt_payment.dart';
 abstract interface class DebtRepository {
   Stream<List<Debt>> watchDebts();
 
+  Stream<List<Debt>> watchDebtsByType(DebtType type);
+
   Future<List<Debt>> getDebts();
 
   Future<Debt?> getDebtById(String id);

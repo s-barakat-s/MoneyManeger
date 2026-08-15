@@ -17,6 +17,8 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import 'transaction_stream_providers.dart';
 import 'widgets/add_transaction_dialog.dart';
 import 'widgets/delete_transaction_dialog.dart';
@@ -70,6 +72,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionsStreamProvider);
     final ownersAsync = ref.watch(ownersStreamProvider);
+    final canCreate =
+        ref.watch(canProvider(Permission.transactionsCreate)).value == true;
+    final canUpdate =
+        ref.watch(canProvider(Permission.transactionsUpdate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.transactionsArchive)).value == true;
 
     return AppShell(
       title: 'Transactions',
@@ -81,8 +89,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
           children: [
             PageHeader(
               title: 'Transactions',
-              actionLabel: 'Add transaction',
-              onAction: () => _showAddDialog(context),
+              actionLabel: canCreate ? 'Add transaction' : null,
+              onAction: canCreate ? () => _showAddDialog(context) : null,
             ),
             const SizedBox(height: AppSpacing.md),
             AppSearchFilterBar(
@@ -101,6 +109,8 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   selectedType: _selectedType,
                   selectedOwnerId: _selectedOwnerId,
                   onClearFilters: _clearAllFilters,
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
                 ),
                 loading: () => const LoadingSkeleton(itemCount: 5),
                 error: (error, stackTrace) => const ErrorState(
@@ -193,7 +203,10 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         return;
       }
 
-      _showAddDialog(context, initialType: initialType);
+      if (ref.read(canProvider(Permission.transactionsCreate)).value ==
+          true) {
+        _showAddDialog(context, initialType: initialType);
+      }
     });
   }
 
@@ -310,6 +323,8 @@ class _TransactionsList extends StatelessWidget {
     required this.selectedType,
     required this.selectedOwnerId,
     required this.onClearFilters,
+    required this.canUpdate,
+    required this.canArchive,
   });
 
   final List<money.Transaction> transactions;
@@ -318,6 +333,8 @@ class _TransactionsList extends StatelessWidget {
   final money.TransactionType? selectedType;
   final String? selectedOwnerId;
   final VoidCallback onClearFilters;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +439,8 @@ class _TransactionsList extends StatelessWidget {
                         ? AmountTextVariant.income
                         : AmountTextVariant.expense,
                   ),
-                  PopupMenuButton<_TransactionAction>(
+                  if (canUpdate || canArchive)
+                    PopupMenuButton<_TransactionAction>(
                     tooltip: 'More actions',
                     icon: const Icon(Icons.more_horiz_rounded),
                     onSelected: (action) {
@@ -432,17 +450,19 @@ class _TransactionsList extends StatelessWidget {
                         _showDeleteDialog(context, transaction);
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _TransactionAction.edit,
-                        child: Text('Edit'),
-                      ),
-                      PopupMenuItem(
-                        value: _TransactionAction.archive,
-                        child: Text('Archive'),
-                      ),
-                    ],
-                  ),
+                      itemBuilder: (context) => [
+                        if (canUpdate)
+                          const PopupMenuItem(
+                            value: _TransactionAction.edit,
+                            child: Text('Edit'),
+                          ),
+                        if (canArchive)
+                          const PopupMenuItem(
+                            value: _TransactionAction.archive,
+                            child: Text('Archive'),
+                          ),
+                      ],
+                    ),
                 ],
               ),
             ],

@@ -1,28 +1,46 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/data/data_scope.dart';
+import '../../../../core/data/firestore_audit_metadata.dart';
+import '../../../activity_log/data/firestore_activity_log_writer.dart';
+import '../../../activity_log/domain/activity_action.dart';
+import '../../../activity_log/domain/activity_entity_type.dart';
 import '../../../../shared/models/debt.dart';
 import '../../../../shared/models/debt_payment.dart';
 import '../../../../shared/models/transaction.dart' as money;
 import '../../domain/repositories/debt_repository.dart';
 
 class FirestoreDebtRepository implements DebtRepository {
-  const FirestoreDebtRepository({
-    required FirebaseFirestore firestore,
-    required String uid,
-  }) : _firestore = firestore,
-       _uid = uid;
+  FirestoreDebtRepository({required DataScope scope, required String actingUid})
+    : _firestore = scope.firestore,
+      _debts = scope.debts,
+      _receivables = scope.receivables,
+      _payments = scope.payments,
+      _transactions = scope.transactions,
+      _activityLog = FirestoreActivityLogWriter(
+        activityLogs: scope.activityLogs,
+        actorUid: actingUid,
+      ),
+      _actingUid = actingUid;
 
   final FirebaseFirestore _firestore;
-  final String _uid;
+  final CollectionReference<Map<String, dynamic>> _debts;
+  final CollectionReference<Map<String, dynamic>> _receivables;
+  final CollectionReference<Map<String, dynamic>> _payments;
+  final CollectionReference<Map<String, dynamic>> _transactions;
+  final FirestoreActivityLogWriter _activityLog;
+  final String _actingUid;
 
   @override
   Stream<List<Debt>> watchDebts() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
+    return _watchCombinedDebts();
+  }
 
-    return _debtsCollection(userId)
+  @override
+  Stream<List<Debt>> watchDebtsByType(DebtType type) {
+    return _collectionForType(type)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.map(_debtFromDoc).toList());
@@ -30,29 +48,62 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Future<List<Debt>> getDebts() async {
-    final snapshot = await _currentDebtsCollection()
-        .orderBy('createdAt', descending: true)
-        .get();
-
-    return snapshot.docs.map(_debtFromDoc).toList();
+    final snapshots = await Future.wait([
+      _debts.orderBy('createdAt', descending: true).get(),
+      _receivables.orderBy('createdAt', descending: true).get(),
+    ]);
+    final values = snapshots
+        .expand((snapshot) => snapshot.docs)
+        .map(_debtFromDoc)
+        .toList();
+    values.sort(_compareByCreatedAtDescending);
+    return values;
   }
 
   @override
   Future<Debt?> getDebtById(String id) async {
-    final snapshot = await _currentDebtsCollection().doc(id).get();
-    if (!snapshot.exists) {
-      return null;
-    }
-
-    return _debtFromDoc(snapshot);
+    final debtSnapshot = await _debts.doc(id).get();
+    if (debtSnapshot.exists) return _debtFromDoc(debtSnapshot);
+    final receivableSnapshot = await _receivables.doc(id).get();
+    return receivableSnapshot.exists ? _debtFromDoc(receivableSnapshot) : null;
   }
 
   @override
   Future<void> saveDebt(Debt debt) async {
-    final collection = _currentDebtsCollection();
+    final collection = _collectionForType(debt.type);
     final doc = debt.id.isEmpty ? collection.doc() : collection.doc(debt.id);
+    final existingSnapshot = debt.id.isEmpty
+        ? null
+        : await doc.get(const GetOptions(source: Source.server));
+    final exists = existingSnapshot?.exists == true;
+    final wasArchived = existingSnapshot?.data()?['status'] == 'archived';
 
-    await doc.set(_debtToFirestore(debt, doc.id));
+    final batch = _firestore.batch();
+    batch.set(doc, {
+      ..._debtToFirestore(debt, doc.id),
+      if (exists && debt.status != DebtStatus.archived) ...{
+        'archivedAt': FieldValue.delete(),
+        'archivedBy': FieldValue.delete(),
+      },
+      ...exists
+          ? FirestoreAuditMetadata.forUpdate(_actingUid)
+          : FirestoreAuditMetadata.forCreate(_actingUid),
+    }, SetOptions(merge: exists));
+    final isReceivable = debt.type == DebtType.owedToUs;
+    _activityLog.appendToBatch(
+      batch,
+      action: _debtWriteAction(
+        isReceivable: isReceivable,
+        exists: exists,
+        restored: wasArchived && debt.status != DebtStatus.archived,
+      ),
+      entityType: isReceivable
+          ? ActivityEntityType.receivable
+          : ActivityEntityType.debt,
+      entityId: doc.id,
+      metadata: {'totalAmount': debt.totalAmount},
+    );
+    await batch.commit();
     final snapshot = await doc.get(const GetOptions(source: Source.server));
     if (!snapshot.exists) {
       throw FirebaseException(
@@ -65,13 +116,27 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Future<void> deleteDebt(String id) async {
-    final doc = _currentDebtsCollection().doc(id);
+    final debt = await getDebtById(id);
+    if (debt == null) return;
+    final doc = _collectionForType(debt.type).doc(id);
 
-    await doc.set({
+    final batch = _firestore.batch();
+    batch.set(doc, {
       'status': DebtStatus.archived.name,
-      'archivedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+      ...FirestoreAuditMetadata.forArchive(_actingUid),
     }, SetOptions(merge: true));
+    final isReceivable = debt.type == DebtType.owedToUs;
+    _activityLog.appendToBatch(
+      batch,
+      action: isReceivable
+          ? ActivityAction.receivableArchived
+          : ActivityAction.debtArchived,
+      entityType: isReceivable
+          ? ActivityEntityType.receivable
+          : ActivityEntityType.debt,
+      entityId: id,
+    );
+    await batch.commit();
     await _confirmDocumentExists(
       doc,
       'Debt archive was not confirmed by Firestore.',
@@ -80,12 +145,7 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Stream<List<DebtPayment>> watchPayments(String debtId) {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _paymentsCollection(userId)
+    return _payments
         .where('debtId', isEqualTo: debtId)
         .orderBy('date', descending: true)
         .snapshots()
@@ -99,9 +159,7 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Future<List<DebtPayment>> getPayments(String debtId) async {
-    final snapshot = await _currentPaymentsCollection()
-        .where('debtId', isEqualTo: debtId)
-        .get();
+    final snapshot = await _payments.where('debtId', isEqualTo: debtId).get();
 
     return snapshot.docs
         .where((doc) => doc.data()['isArchived'] != true)
@@ -111,12 +169,31 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Future<void> savePayment(DebtPayment payment) async {
-    final collection = _currentPaymentsCollection();
+    final collection = _payments;
     final doc = payment.id.isEmpty
         ? collection.doc()
         : collection.doc(payment.id);
+    final exists =
+        payment.id.isNotEmpty &&
+        (await doc.get(const GetOptions(source: Source.server))).exists;
 
-    await doc.set(_paymentToFirestore(payment, doc.id));
+    final batch = _firestore.batch();
+    batch.set(doc, {
+      ..._paymentToFirestore(payment, doc.id),
+      ...exists
+          ? FirestoreAuditMetadata.forUpdate(_actingUid)
+          : FirestoreAuditMetadata.forCreate(_actingUid),
+    }, SetOptions(merge: exists));
+    _activityLog.appendToBatch(
+      batch,
+      action: exists
+          ? ActivityAction.paymentUpdated
+          : ActivityAction.paymentCreated,
+      entityType: ActivityEntityType.payment,
+      entityId: doc.id,
+      metadata: {'debtId': payment.debtId, 'amount': payment.amount},
+    );
+    await batch.commit();
   }
 
   @override
@@ -125,16 +202,11 @@ class FirestoreDebtRepository implements DebtRepository {
     required DebtPayment payment,
     required String ownerId,
   }) async {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
     final paymentDoc = payment.id.isEmpty
-        ? _paymentsCollection(userId).doc()
-        : _paymentsCollection(userId).doc(payment.id);
-    final transactionDoc = _transactionsCollection(userId).doc();
-    final debtDoc = _debtsCollection(userId).doc(debt.id);
+        ? _payments.doc()
+        : _payments.doc(payment.id);
+    final transactionDoc = _transactions.doc();
+    final debtDoc = _collectionForType(debt.type).doc(debt.id);
 
     final newPaidAmount = await _firestore.runTransaction<double>((
       firestoreTransaction,
@@ -168,14 +240,14 @@ class FirestoreDebtRepository implements DebtRepository {
           ? DebtStatus.paid
           : DebtStatus.active;
 
-      firestoreTransaction.set(
-        paymentDoc,
-        _paymentToFirestore(payment, paymentDoc.id),
-      );
+      firestoreTransaction.set(paymentDoc, {
+        ..._paymentToFirestore(payment, paymentDoc.id),
+        ...FirestoreAuditMetadata.forCreate(_actingUid),
+      });
       firestoreTransaction.set(debtDoc, {
         'paidAmount': updatedPaidAmount,
         'status': status.name,
-        'updatedAt': FieldValue.serverTimestamp(),
+        ...FirestoreAuditMetadata.forUpdate(_actingUid),
       }, SetOptions(merge: true));
       firestoreTransaction.set(transactionDoc, {
         'id': transactionDoc.id,
@@ -184,7 +256,19 @@ class FirestoreDebtRepository implements DebtRepository {
         'amount': payment.amount,
         'date': Timestamp.fromDate(payment.date),
         'note': _paymentTransactionNote(serverDebt, payment),
+        ...FirestoreAuditMetadata.forCreate(_actingUid),
       });
+      _activityLog.appendToTransaction(
+        firestoreTransaction,
+        action: ActivityAction.paymentCreated,
+        entityType: ActivityEntityType.payment,
+        entityId: paymentDoc.id,
+        metadata: {
+          'debtId': debt.id,
+          'amount': payment.amount,
+          'ownerId': ownerId,
+        },
+      );
 
       return updatedPaidAmount;
     });
@@ -206,62 +290,78 @@ class FirestoreDebtRepository implements DebtRepository {
 
   @override
   Future<void> deletePayment(String id) async {
-    final doc = _currentPaymentsCollection().doc(id);
+    final doc = _payments.doc(id);
+    final snapshot = await doc.get(const GetOptions(source: Source.server));
+    if (!snapshot.exists) return;
+    final debtId = snapshot.data()?['debtId'] as String?;
+    if (debtId == null || debtId.isEmpty) {
+      throw StateError('This payment is not linked to a debt or receivable.');
+    }
 
-    await doc.set({
+    final batch = _firestore.batch();
+    batch.set(doc, {
       'isArchived': true,
-      'archivedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+      ...FirestoreAuditMetadata.forArchive(_actingUid),
     }, SetOptions(merge: true));
+    _activityLog.appendToBatch(
+      batch,
+      action: ActivityAction.paymentArchived,
+      entityType: ActivityEntityType.payment,
+      entityId: id,
+      metadata: {'debtId': debtId},
+    );
+    await batch.commit();
     await _confirmDocumentExists(
       doc,
       'Payment archive was not confirmed by Firestore.',
     );
   }
 
-  CollectionReference<Map<String, dynamic>> _currentDebtsCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
+  CollectionReference<Map<String, dynamic>> _collectionForType(DebtType type) {
+    return type == DebtType.weOwe ? _debts : _receivables;
+  }
+
+  Stream<List<Debt>> _watchCombinedDebts() {
+    late StreamController<List<Debt>> controller;
+    StreamSubscription? debtSubscription;
+    StreamSubscription? receivableSubscription;
+    List<Debt>? debts;
+    List<Debt>? receivables;
+
+    void emit() {
+      if (debts == null || receivables == null || controller.isClosed) return;
+      final combined = [...debts!, ...receivables!]
+        ..sort(_compareByCreatedAtDescending);
+      controller.add(combined);
     }
 
-    return _debtsCollection(userId);
-  }
-
-  CollectionReference<Map<String, dynamic>> _currentPaymentsCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
-    return _paymentsCollection(userId);
-  }
-
-  CollectionReference<Map<String, dynamic>> _debtsCollection(String userId) {
-    return _firestore.collection('users').doc(userId).collection('debts');
-  }
-
-  CollectionReference<Map<String, dynamic>> _paymentsCollection(String userId) {
-    return _firestore.collection('users').doc(userId).collection('payments');
-  }
-
-  CollectionReference<Map<String, dynamic>> _transactionsCollection(
-    String userId,
-  ) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('transactions');
-  }
-
-  String? _currentUserIdOrNull() {
-    return _uid;
+    controller = StreamController<List<Debt>>(
+      onListen: () {
+        debtSubscription = _debts
+            .orderBy('createdAt', descending: true)
+            .snapshots()
+            .listen((snapshot) {
+              debts = snapshot.docs.map(_debtFromDoc).toList();
+              emit();
+            }, onError: controller.addError);
+        receivableSubscription = _receivables
+            .orderBy('createdAt', descending: true)
+            .snapshots()
+            .listen((snapshot) {
+              receivables = snapshot.docs.map(_debtFromDoc).toList();
+              emit();
+            }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await debtSubscription?.cancel();
+        await receivableSubscription?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   Debt _debtFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
-    final createdAt = data['createdAt'];
-
     return Debt(
       id: doc.id,
       personName: data['personName'] as String? ?? '',
@@ -269,11 +369,9 @@ class FirestoreDebtRepository implements DebtRepository {
       totalAmount: (data['totalAmount'] as num?)?.toDouble() ?? 0,
       paidAmount: (data['paidAmount'] as num?)?.toDouble() ?? 0,
       status: _statusFromFirestore(data['status']),
-      createdAt: createdAt is Timestamp ? createdAt.toDate() : DateTime.now(),
-      updatedAt: _dateFromFirestore(data['updatedAt']),
       dueDate: _dateFromFirestore(data['dueDate']),
-      archivedAt: _dateFromFirestore(data['archivedAt']),
       note: data['note'] as String?,
+      audit: FirestoreAuditMetadata.fromFirestore(data),
     );
   }
 
@@ -287,6 +385,7 @@ class FirestoreDebtRepository implements DebtRepository {
       amount: (data['amount'] as num?)?.toDouble() ?? 0,
       date: date is Timestamp ? date.toDate() : DateTime.now(),
       note: data['note'] as String?,
+      audit: FirestoreAuditMetadata.fromFirestore(data),
     );
   }
 
@@ -298,14 +397,9 @@ class FirestoreDebtRepository implements DebtRepository {
       'totalAmount': debt.totalAmount,
       'paidAmount': debt.paidAmount,
       'status': debt.status.name,
-      'createdAt': Timestamp.fromDate(debt.createdAt),
-      'updatedAt': Timestamp.fromDate(debt.updatedAt ?? DateTime.now()),
       'dueDate': debt.dueDate == null
           ? null
           : Timestamp.fromDate(debt.dueDate!),
-      'archivedAt': debt.archivedAt == null
-          ? null
-          : Timestamp.fromDate(debt.archivedAt!),
       'note': debt.note,
     };
   }
@@ -328,6 +422,21 @@ class FirestoreDebtRepository implements DebtRepository {
     final base = '$label: ${debt.personName}';
 
     return extraNote == null || extraNote.isEmpty ? base : '$base - $extraNote';
+  }
+
+  ActivityAction _debtWriteAction({
+    required bool isReceivable,
+    required bool exists,
+    required bool restored,
+  }) {
+    if (isReceivable) {
+      if (!exists) return ActivityAction.receivableCreated;
+      return restored
+          ? ActivityAction.receivableRestored
+          : ActivityAction.receivableUpdated;
+    }
+    if (!exists) return ActivityAction.debtCreated;
+    return restored ? ActivityAction.debtRestored : ActivityAction.debtUpdated;
   }
 
   money.TransactionType _transactionTypeForDebt(Debt debt) {
@@ -361,6 +470,14 @@ class FirestoreDebtRepository implements DebtRepository {
 
   DateTime? _dateFromFirestore(Object? value) {
     return value is Timestamp ? value.toDate() : null;
+  }
+
+  int _compareByCreatedAtDescending(Debt left, Debt right) {
+    final leftCreatedAt = left.audit.createdAt;
+    final rightCreatedAt = right.audit.createdAt;
+    if (leftCreatedAt == null) return rightCreatedAt == null ? 0 : 1;
+    if (rightCreatedAt == null) return -1;
+    return rightCreatedAt.compareTo(leftCreatedAt);
   }
 
   Future<void> _confirmDocumentExists(

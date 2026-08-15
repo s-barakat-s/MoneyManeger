@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/firebase/firebase_providers.dart';
+import 'features/business/application/business_access_providers.dart';
+import 'features/business/data/business_access_data_providers.dart';
 import 'features/company_assets/application/company_asset_providers.dart';
 import 'features/company_assets/data/company_asset_data_providers.dart';
 import 'features/debts/application/debt_providers.dart';
@@ -23,6 +25,9 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         firebaseAppProvider.overrideWithValue(firebaseApp),
+        businessAccessRepositoryProvider.overrideWith((ref) {
+          return ref.watch(firestoreBusinessAccessRepositoryProvider);
+        }),
         ownerRepositoryProvider.overrideWith((ref) {
           return ref.watch(firestoreOwnerRepositoryProvider);
         }),

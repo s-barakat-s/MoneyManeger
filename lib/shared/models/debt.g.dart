@@ -15,17 +15,13 @@ _Debt _$DebtFromJson(Map<String, dynamic> json) => _Debt(
   status:
       $enumDecodeNullable(_$DebtStatusEnumMap, json['status']) ??
       DebtStatus.active,
-  createdAt: DateTime.parse(json['createdAt'] as String),
-  updatedAt: json['updatedAt'] == null
-      ? null
-      : DateTime.parse(json['updatedAt'] as String),
   dueDate: json['dueDate'] == null
       ? null
       : DateTime.parse(json['dueDate'] as String),
-  archivedAt: json['archivedAt'] == null
-      ? null
-      : DateTime.parse(json['archivedAt'] as String),
   note: json['note'] as String?,
+  audit: json['audit'] == null
+      ? const AuditMetadata()
+      : AuditMetadata.fromJson(json['audit'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$DebtToJson(_Debt instance) => <String, dynamic>{
@@ -35,11 +31,9 @@ Map<String, dynamic> _$DebtToJson(_Debt instance) => <String, dynamic>{
   'totalAmount': instance.totalAmount,
   'paidAmount': instance.paidAmount,
   'status': _$DebtStatusEnumMap[instance.status]!,
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt?.toIso8601String(),
   'dueDate': instance.dueDate?.toIso8601String(),
-  'archivedAt': instance.archivedAt?.toIso8601String(),
   'note': instance.note,
+  'audit': instance.audit,
 };
 
 const _$DebtTypeEnumMap = {

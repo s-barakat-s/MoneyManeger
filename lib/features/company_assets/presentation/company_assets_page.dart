@@ -17,6 +17,8 @@ import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../application/company_asset_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import 'asset_category_label.dart';
 import 'widgets/asset_form_dialog.dart';
 import 'widgets/delete_asset_dialog.dart';
@@ -53,6 +55,12 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
   Widget build(BuildContext context) {
     final assetsAsync = ref.watch(assetsStreamProvider);
     final totalAsync = ref.watch(totalAssetsValueProvider);
+    final canCreate =
+        ref.watch(canProvider(Permission.assetsCreate)).value == true;
+    final canUpdate =
+        ref.watch(canProvider(Permission.assetsUpdate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.assetsArchive)).value == true;
 
     return HomeSummaryHero(
       tag: HomeSummaryHeroTags.assets,
@@ -65,8 +73,8 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
           children: [
             PageHeader(
               title: 'Assets',
-              actionLabel: 'Add asset',
-              onAction: () => _showAddDialog(context),
+              actionLabel: canCreate ? 'Add asset' : null,
+              onAction: canCreate ? () => _showAddDialog(context) : null,
             ),
             const SizedBox(height: AppSpacing.md),
             totalAsync.when(
@@ -92,7 +100,9 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
                   searchText: _searchText,
                   selectedCategory: _selectedCategory,
                   onClearFilters: _clearAllFilters,
-                  onAdd: () => _showAddDialog(context),
+                  onAdd: canCreate ? () => _showAddDialog(context) : null,
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
                 ),
                 loading: () => const LoadingSkeleton(itemCount: 4),
                 error: (error, stackTrace) => const ErrorState(
@@ -203,13 +213,17 @@ class _AssetsList extends StatelessWidget {
     required this.selectedCategory,
     required this.onClearFilters,
     required this.onAdd,
+    required this.canUpdate,
+    required this.canArchive,
   });
 
   final List<CompanyAsset> assets;
   final String searchText;
   final AssetCategory? selectedCategory;
   final VoidCallback onClearFilters;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -238,11 +252,13 @@ class _AssetsList extends StatelessWidget {
         title: 'No assets yet',
         description:
             'Company assets like equipment, devices, inventory, or furniture will appear here once added.',
-        action: FilledButton.icon(
-          onPressed: onAdd,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add asset'),
-        ),
+        action: onAdd == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add asset'),
+              ),
       );
     }
 
@@ -267,7 +283,11 @@ class _AssetsList extends StatelessWidget {
       separatorBuilder: (context, index) =>
           const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) =>
-          _AssetListItem(asset: visibleAssets[index]),
+          _AssetListItem(
+            asset: visibleAssets[index],
+            canUpdate: canUpdate,
+            canArchive: canArchive,
+          ),
     );
   }
 }
@@ -329,9 +349,15 @@ class _AssetFilterSheetState extends State<_AssetFilterSheet> {
 }
 
 class _AssetListItem extends StatelessWidget {
-  const _AssetListItem({required this.asset});
+  const _AssetListItem({
+    required this.asset,
+    required this.canUpdate,
+    required this.canArchive,
+  });
 
   final CompanyAsset asset;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -365,10 +391,13 @@ class _AssetListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              _AssetMenu(
-                onEdit: () => _showEditDialog(context),
-                onArchive: () => _showDeleteDialog(context),
-              ),
+              if (canUpdate || canArchive)
+                _AssetMenu(
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
+                  onEdit: () => _showEditDialog(context),
+                  onArchive: () => _showDeleteDialog(context),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -433,8 +462,15 @@ class _AssetListItem extends StatelessWidget {
 }
 
 class _AssetMenu extends StatelessWidget {
-  const _AssetMenu({required this.onEdit, required this.onArchive});
+  const _AssetMenu({
+    required this.canUpdate,
+    required this.canArchive,
+    required this.onEdit,
+    required this.onArchive,
+  });
 
+  final bool canUpdate;
+  final bool canArchive;
   final VoidCallback onEdit;
   final VoidCallback onArchive;
 
@@ -450,12 +486,17 @@ class _AssetMenu extends StatelessWidget {
           onArchive();
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: _AssetAction.edit, child: Text('Edit')),
-        PopupMenuItem(
-          value: _AssetAction.archive,
-          child: Text('Archive asset'),
-        ),
+      itemBuilder: (context) => [
+        if (canUpdate)
+          const PopupMenuItem(
+            value: _AssetAction.edit,
+            child: Text('Edit'),
+          ),
+        if (canArchive)
+          const PopupMenuItem(
+            value: _AssetAction.archive,
+            child: Text('Archive asset'),
+          ),
       ],
     );
   }

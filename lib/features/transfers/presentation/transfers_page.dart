@@ -17,6 +17,8 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import 'transfer_stream_providers.dart';
 import 'widgets/add_transfer_dialog.dart';
 import 'widgets/delete_transfer_dialog.dart';
@@ -69,6 +71,10 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
   Widget build(BuildContext context) {
     final transfersAsync = ref.watch(transfersStreamProvider);
     final ownersAsync = ref.watch(ownersStreamProvider);
+    final canCreate =
+        ref.watch(canProvider(Permission.transfersCreate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.transfersArchive)).value == true;
 
     return AppShell(
       title: 'Transfers',
@@ -81,8 +87,8 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
             children: [
               PageHeader(
                 title: 'Transfers',
-                actionLabel: 'Add transfer',
-                onAction: () => _showAddDialog(context),
+                actionLabel: canCreate ? 'Add transfer' : null,
+                onAction: canCreate ? () => _showAddDialog(context) : null,
               ),
               const SizedBox(height: AppSpacing.md),
               AppSearchFilterBar(
@@ -100,6 +106,7 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
                   selectedFromOwnerId: _selectedFromOwnerId,
                   selectedToOwnerId: _selectedToOwnerId,
                   onClearFilters: _clearAllFilters,
+                  canArchive: canArchive,
                 ),
               ),
             ],
@@ -193,7 +200,9 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
         return;
       }
 
-      _showAddDialog(context);
+      if (ref.read(canProvider(Permission.transfersCreate)).value == true) {
+        _showAddDialog(context);
+      }
     });
   }
 }
@@ -306,6 +315,7 @@ class _TransfersList extends StatelessWidget {
     required this.selectedFromOwnerId,
     required this.selectedToOwnerId,
     required this.onClearFilters,
+    required this.canArchive,
   });
 
   final List<Transfer> transfers;
@@ -314,6 +324,7 @@ class _TransfersList extends StatelessWidget {
   final String? selectedFromOwnerId;
   final String? selectedToOwnerId;
   final VoidCallback onClearFilters;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -415,7 +426,8 @@ class _TransfersList extends StatelessWidget {
                     amountText: formatEgpCurrency(transfer.amount),
                     variant: AmountTextVariant.neutral,
                   ),
-                  PopupMenuButton<_TransferAction>(
+                  if (canArchive)
+                    PopupMenuButton<_TransferAction>(
                     tooltip: 'More actions',
                     icon: const Icon(Icons.more_horiz_rounded),
                     onSelected: (_) => _showDeleteDialog(context, transfer),

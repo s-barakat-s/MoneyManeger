@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Transfer {
 
- String get id; String get fromOwnerId; String get toOwnerId; double get amount; DateTime get date; String? get note;
+ String get id; String get fromOwnerId; String get toOwnerId; double get amount; DateTime get date; String? get note; AuditMetadata get audit;
 /// Create a copy of Transfer
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $TransferCopyWith<Transfer> get copyWith => _$TransferCopyWithImpl<Transfer>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Transfer&&(identical(other.id, id) || other.id == id)&&(identical(other.fromOwnerId, fromOwnerId) || other.fromOwnerId == fromOwnerId)&&(identical(other.toOwnerId, toOwnerId) || other.toOwnerId == toOwnerId)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.date, date) || other.date == date)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Transfer&&(identical(other.id, id) || other.id == id)&&(identical(other.fromOwnerId, fromOwnerId) || other.fromOwnerId == fromOwnerId)&&(identical(other.toOwnerId, toOwnerId) || other.toOwnerId == toOwnerId)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.date, date) || other.date == date)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,fromOwnerId,toOwnerId,amount,date,note);
+int get hashCode => Object.hash(runtimeType,id,fromOwnerId,toOwnerId,amount,date,note,audit);
 
 @override
 String toString() {
-  return 'Transfer(id: $id, fromOwnerId: $fromOwnerId, toOwnerId: $toOwnerId, amount: $amount, date: $date, note: $note)';
+  return 'Transfer(id: $id, fromOwnerId: $fromOwnerId, toOwnerId: $toOwnerId, amount: $amount, date: $date, note: $note, audit: $audit)';
 }
 
 
@@ -48,11 +48,11 @@ abstract mixin class $TransferCopyWith<$Res>  {
   factory $TransferCopyWith(Transfer value, $Res Function(Transfer) _then) = _$TransferCopyWithImpl;
 @useResult
 $Res call({
- String id, String fromOwnerId, String toOwnerId, double amount, DateTime date, String? note
+ String id, String fromOwnerId, String toOwnerId, double amount, DateTime date, String? note, AuditMetadata audit
 });
 
 
-
+$AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -65,7 +65,7 @@ class _$TransferCopyWithImpl<$Res>
 
 /// Create a copy of Transfer
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? fromOwnerId = null,Object? toOwnerId = null,Object? amount = null,Object? date = null,Object? note = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? fromOwnerId = null,Object? toOwnerId = null,Object? amount = null,Object? date = null,Object? note = freezed,Object? audit = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,fromOwnerId: null == fromOwnerId ? _self.fromOwnerId : fromOwnerId // ignore: cast_nullable_to_non_nullable
@@ -73,10 +73,20 @@ as String,toOwnerId: null == toOwnerId ? _self.toOwnerId : toOwnerId // ignore: 
 as String,amount: null == amount ? _self.amount : amount // ignore: cast_nullable_to_non_nullable
 as double,date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as DateTime,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
+/// Create a copy of Transfer
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 
@@ -158,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note,  AuditMetadata audit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Transfer() when $default != null:
-return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note);case _:
+return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note,_that.audit);case _:
   return orElse();
 
 }
@@ -179,10 +189,10 @@ return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.da
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note,  AuditMetadata audit)  $default,) {final _that = this;
 switch (_that) {
 case _Transfer():
-return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note);case _:
+return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note,_that.audit);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +209,10 @@ return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.da
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String fromOwnerId,  String toOwnerId,  double amount,  DateTime date,  String? note,  AuditMetadata audit)?  $default,) {final _that = this;
 switch (_that) {
 case _Transfer() when $default != null:
-return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note);case _:
+return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.date,_that.note,_that.audit);case _:
   return null;
 
 }
@@ -214,7 +224,7 @@ return $default(_that.id,_that.fromOwnerId,_that.toOwnerId,_that.amount,_that.da
 @JsonSerializable()
 
 class _Transfer implements Transfer {
-  const _Transfer({required this.id, required this.fromOwnerId, required this.toOwnerId, required this.amount, required this.date, this.note});
+  const _Transfer({required this.id, required this.fromOwnerId, required this.toOwnerId, required this.amount, required this.date, this.note, this.audit = const AuditMetadata()});
   factory _Transfer.fromJson(Map<String, dynamic> json) => _$TransferFromJson(json);
 
 @override final  String id;
@@ -223,6 +233,7 @@ class _Transfer implements Transfer {
 @override final  double amount;
 @override final  DateTime date;
 @override final  String? note;
+@override@JsonKey() final  AuditMetadata audit;
 
 /// Create a copy of Transfer
 /// with the given fields replaced by the non-null parameter values.
@@ -237,16 +248,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Transfer&&(identical(other.id, id) || other.id == id)&&(identical(other.fromOwnerId, fromOwnerId) || other.fromOwnerId == fromOwnerId)&&(identical(other.toOwnerId, toOwnerId) || other.toOwnerId == toOwnerId)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.date, date) || other.date == date)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Transfer&&(identical(other.id, id) || other.id == id)&&(identical(other.fromOwnerId, fromOwnerId) || other.fromOwnerId == fromOwnerId)&&(identical(other.toOwnerId, toOwnerId) || other.toOwnerId == toOwnerId)&&(identical(other.amount, amount) || other.amount == amount)&&(identical(other.date, date) || other.date == date)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,fromOwnerId,toOwnerId,amount,date,note);
+int get hashCode => Object.hash(runtimeType,id,fromOwnerId,toOwnerId,amount,date,note,audit);
 
 @override
 String toString() {
-  return 'Transfer(id: $id, fromOwnerId: $fromOwnerId, toOwnerId: $toOwnerId, amount: $amount, date: $date, note: $note)';
+  return 'Transfer(id: $id, fromOwnerId: $fromOwnerId, toOwnerId: $toOwnerId, amount: $amount, date: $date, note: $note, audit: $audit)';
 }
 
 
@@ -257,11 +268,11 @@ abstract mixin class _$TransferCopyWith<$Res> implements $TransferCopyWith<$Res>
   factory _$TransferCopyWith(_Transfer value, $Res Function(_Transfer) _then) = __$TransferCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String fromOwnerId, String toOwnerId, double amount, DateTime date, String? note
+ String id, String fromOwnerId, String toOwnerId, double amount, DateTime date, String? note, AuditMetadata audit
 });
 
 
-
+@override $AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -274,7 +285,7 @@ class __$TransferCopyWithImpl<$Res>
 
 /// Create a copy of Transfer
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? fromOwnerId = null,Object? toOwnerId = null,Object? amount = null,Object? date = null,Object? note = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? fromOwnerId = null,Object? toOwnerId = null,Object? amount = null,Object? date = null,Object? note = freezed,Object? audit = null,}) {
   return _then(_Transfer(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,fromOwnerId: null == fromOwnerId ? _self.fromOwnerId : fromOwnerId // ignore: cast_nullable_to_non_nullable
@@ -282,11 +293,21 @@ as String,toOwnerId: null == toOwnerId ? _self.toOwnerId : toOwnerId // ignore: 
 as String,amount: null == amount ? _self.amount : amount // ignore: cast_nullable_to_non_nullable
 as double,date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
 as DateTime,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
 
+/// Create a copy of Transfer
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 // dart format on

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/models/audit_metadata.dart';
 import '../../../../shared/models/debt.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
@@ -38,7 +39,7 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
       _personController.text = debt.personName;
       _amountController.text = debt.totalAmount.toString();
       _noteController.text = debt.note ?? '';
-      _createdAt = debt.createdAt;
+      _createdAt = debt.audit.createdAt ?? DateTime.now();
       _dueDate = debt.dueDate;
     }
   }
@@ -192,13 +193,12 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
           totalAmount: double.parse(_amountController.text.trim()),
           paidAmount: widget.debt?.paidAmount ?? 0,
           status: widget.debt?.status ?? DebtStatus.active,
-          createdAt: _createdAt,
-          updatedAt: _isEditing ? DateTime.now() : null,
           dueDate: _dueDate,
-          archivedAt: widget.debt?.archivedAt,
           note: _noteController.text.trim().isEmpty
               ? null
               : _noteController.text.trim(),
+          audit:
+              widget.debt?.audit ?? AuditMetadata(createdAt: _createdAt),
         ),
       );
 

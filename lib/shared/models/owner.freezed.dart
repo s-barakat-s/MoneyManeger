@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Owner {
 
- String get id; String get name; DateTime get createdAt;
+ String get id; String get name; AuditMetadata get audit;
 /// Create a copy of Owner
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $OwnerCopyWith<Owner> get copyWith => _$OwnerCopyWithImpl<Owner>(this as Owner, 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Owner&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Owner&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt);
+int get hashCode => Object.hash(runtimeType,id,name,audit);
 
 @override
 String toString() {
-  return 'Owner(id: $id, name: $name, createdAt: $createdAt)';
+  return 'Owner(id: $id, name: $name, audit: $audit)';
 }
 
 
@@ -48,11 +48,11 @@ abstract mixin class $OwnerCopyWith<$Res>  {
   factory $OwnerCopyWith(Owner value, $Res Function(Owner) _then) = _$OwnerCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, DateTime createdAt
+ String id, String name, AuditMetadata audit
 });
 
 
-
+$AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -65,15 +65,24 @@ class _$OwnerCopyWithImpl<$Res>
 
 /// Create a copy of Owner
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? createdAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? audit = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as String,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
+/// Create a copy of Owner
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 
@@ -155,10 +164,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  AuditMetadata audit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Owner() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt);case _:
+return $default(_that.id,_that.name,_that.audit);case _:
   return orElse();
 
 }
@@ -176,10 +185,10 @@ return $default(_that.id,_that.name,_that.createdAt);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  AuditMetadata audit)  $default,) {final _that = this;
 switch (_that) {
 case _Owner():
-return $default(_that.id,_that.name,_that.createdAt);case _:
+return $default(_that.id,_that.name,_that.audit);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -196,10 +205,10 @@ return $default(_that.id,_that.name,_that.createdAt);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  DateTime createdAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  AuditMetadata audit)?  $default,) {final _that = this;
 switch (_that) {
 case _Owner() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt);case _:
+return $default(_that.id,_that.name,_that.audit);case _:
   return null;
 
 }
@@ -211,12 +220,12 @@ return $default(_that.id,_that.name,_that.createdAt);case _:
 @JsonSerializable()
 
 class _Owner implements Owner {
-  const _Owner({required this.id, required this.name, required this.createdAt});
+  const _Owner({required this.id, required this.name, this.audit = const AuditMetadata()});
   factory _Owner.fromJson(Map<String, dynamic> json) => _$OwnerFromJson(json);
 
 @override final  String id;
 @override final  String name;
-@override final  DateTime createdAt;
+@override@JsonKey() final  AuditMetadata audit;
 
 /// Create a copy of Owner
 /// with the given fields replaced by the non-null parameter values.
@@ -231,16 +240,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Owner&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Owner&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt);
+int get hashCode => Object.hash(runtimeType,id,name,audit);
 
 @override
 String toString() {
-  return 'Owner(id: $id, name: $name, createdAt: $createdAt)';
+  return 'Owner(id: $id, name: $name, audit: $audit)';
 }
 
 
@@ -251,11 +260,11 @@ abstract mixin class _$OwnerCopyWith<$Res> implements $OwnerCopyWith<$Res> {
   factory _$OwnerCopyWith(_Owner value, $Res Function(_Owner) _then) = __$OwnerCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, DateTime createdAt
+ String id, String name, AuditMetadata audit
 });
 
 
-
+@override $AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -268,16 +277,25 @@ class __$OwnerCopyWithImpl<$Res>
 
 /// Create a copy of Owner
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? createdAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? audit = null,}) {
   return _then(_Owner(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,
+as String,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
 
+/// Create a copy of Owner
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 // dart format on

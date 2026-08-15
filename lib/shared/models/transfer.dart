@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'audit_metadata.dart';
+
 part 'transfer.freezed.dart';
 part 'transfer.g.dart';
 
@@ -13,6 +15,7 @@ abstract class Transfer with _$Transfer {
     required double amount,
     required DateTime date,
     String? note,
+    @Default(AuditMetadata()) AuditMetadata audit,
   }) = _Transfer;
 
   factory Transfer.fromJson(Map<String, dynamic> json) =>

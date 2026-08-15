@@ -1,26 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/data/data_scope.dart';
+import '../../../../core/data/firestore_audit_metadata.dart';
+import '../../../activity_log/data/firestore_activity_log_writer.dart';
+import '../../../activity_log/domain/activity_action.dart';
+import '../../../activity_log/domain/activity_entity_type.dart';
 import '../../../../shared/models/company_asset.dart';
 import '../../domain/repositories/company_asset_repository.dart';
 
 class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
-  const FirestoreCompanyAssetRepository({
-    required FirebaseFirestore firestore,
-    required String uid,
-  }) : _firestore = firestore,
-       _uid = uid;
+  FirestoreCompanyAssetRepository({
+    required DataScope scope,
+    required String actingUid,
+  }) : _firestore = scope.firestore,
+       _assets = scope.assets,
+       _activityLog = FirestoreActivityLogWriter(
+         activityLogs: scope.activityLogs,
+         actorUid: actingUid,
+       ),
+       _actingUid = actingUid;
 
   final FirebaseFirestore _firestore;
-  final String _uid;
+  final CollectionReference<Map<String, dynamic>> _assets;
+  final FirestoreActivityLogWriter _activityLog;
+  final String _actingUid;
 
   @override
   Stream<List<CompanyAsset>> watchAssets() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      return Stream.error(StateError('No authenticated user is available.'));
-    }
-
-    return _assetsCollection(userId)
+    return _assets
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map(
@@ -33,18 +40,42 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
 
   @override
   Future<void> createAsset(CompanyAsset asset) async {
-    final collection = _currentAssetsCollection();
+    final collection = _assets;
     final doc = asset.id.isEmpty ? collection.doc() : collection.doc(asset.id);
 
-    await doc.set(_assetToFirestore(asset, doc.id));
+    final batch = _firestore.batch();
+    batch.set(doc, {
+      ..._assetToFirestore(asset, doc.id),
+      ...FirestoreAuditMetadata.forCreate(_actingUid),
+    });
+    _activityLog.appendToBatch(
+      batch,
+      action: ActivityAction.assetCreated,
+      entityType: ActivityEntityType.asset,
+      entityId: doc.id,
+      metadata: {'purchasePrice': asset.purchasePrice},
+    );
+    await batch.commit();
     await _confirmDocumentExists(doc, 'Asset was not confirmed by Firestore.');
   }
 
   @override
   Future<void> updateAsset(CompanyAsset asset) async {
-    final doc = _currentAssetsCollection().doc(asset.id);
+    final doc = _assets.doc(asset.id);
 
-    await doc.set(_assetToFirestore(asset, asset.id));
+    final batch = _firestore.batch();
+    batch.set(doc, {
+      ..._assetToFirestore(asset, asset.id),
+      ...FirestoreAuditMetadata.forUpdate(_actingUid),
+    }, SetOptions(merge: true));
+    _activityLog.appendToBatch(
+      batch,
+      action: ActivityAction.assetUpdated,
+      entityType: ActivityEntityType.asset,
+      entityId: asset.id,
+      metadata: {'purchasePrice': asset.purchasePrice},
+    );
+    await batch.commit();
     await _confirmDocumentExists(
       doc,
       'Asset update was not confirmed by Firestore.',
@@ -53,41 +84,29 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
 
   @override
   Future<void> deleteAsset(String id) async {
-    final doc = _currentAssetsCollection().doc(id);
+    final doc = _assets.doc(id);
 
-    await doc.set({
+    final batch = _firestore.batch();
+    batch.set(doc, {
       'isArchived': true,
-      'archivedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+      ...FirestoreAuditMetadata.forArchive(_actingUid),
     }, SetOptions(merge: true));
+    _activityLog.appendToBatch(
+      batch,
+      action: ActivityAction.assetArchived,
+      entityType: ActivityEntityType.asset,
+      entityId: id,
+    );
+    await batch.commit();
     await _confirmDocumentExists(
       doc,
       'Asset archive was not confirmed by Firestore.',
     );
   }
 
-  CollectionReference<Map<String, dynamic>> _currentAssetsCollection() {
-    final userId = _currentUserIdOrNull();
-    if (userId == null) {
-      throw StateError('No authenticated user is available.');
-    }
-
-    return _assetsCollection(userId);
-  }
-
-  CollectionReference<Map<String, dynamic>> _assetsCollection(String userId) {
-    return _firestore.collection('users').doc(userId).collection('assets');
-  }
-
-  String? _currentUserIdOrNull() {
-    return _uid;
-  }
-
   CompanyAsset _assetFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     final purchaseDate = data['purchaseDate'];
-    final createdAt = data['createdAt'];
-
     return CompanyAsset(
       id: doc.id,
       name: data['name'] as String? ?? '',
@@ -96,8 +115,8 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
       purchaseDate: purchaseDate is Timestamp
           ? purchaseDate.toDate()
           : DateTime.now(),
-      createdAt: createdAt is Timestamp ? createdAt.toDate() : DateTime.now(),
       note: data['note'] as String?,
+      audit: FirestoreAuditMetadata.fromFirestore(data),
     );
   }
 
@@ -109,7 +128,6 @@ class FirestoreCompanyAssetRepository implements CompanyAssetRepository {
       'purchasePrice': asset.purchasePrice,
       'purchaseDate': Timestamp.fromDate(asset.purchaseDate),
       'note': asset.note,
-      'createdAt': Timestamp.fromDate(asset.createdAt),
     };
   }
 

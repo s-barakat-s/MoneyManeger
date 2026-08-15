@@ -13,6 +13,8 @@ import 'features/auth/application/unauthenticated_entry_controller.dart';
 import 'features/auth/domain/saved_account.dart';
 import 'features/auth/presentation/auth_page.dart';
 import 'features/auth/presentation/saved_accounts_landing_page.dart';
+import 'features/business/application/business_providers.dart';
+import 'features/business/presentation/workspace_onboarding_page.dart';
 import 'shared/navigation/root_back_exit.dart';
 
 final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -135,7 +137,6 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
   @override
   Widget build(BuildContext context) {
     ref.watch(savedAccountSynchronizationProvider);
-    final router = ref.watch(appRouterProvider);
     final authState = ref.watch(authStateProvider);
     final registrationInProgress = ref.watch(registrationInProgressProvider);
     final themeMode = ref.watch(themeModeProvider);
@@ -265,6 +266,37 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
               );
             }
 
+            final workspaceResolution = ref.watch(workspaceResolutionProvider);
+            if (workspaceResolution.isLoading) {
+              return _workspaceGateApp(
+                themeMode: themeMode,
+                uid: user.uid,
+                home: const _WorkspaceResolutionLoadingPage(),
+              );
+            }
+            if (workspaceResolution.hasError) {
+              return _workspaceGateApp(
+                themeMode: themeMode,
+                uid: user.uid,
+                home: _WorkspaceResolutionErrorPage(
+                  onRetry: () => ref.invalidate(workspaceResolutionProvider),
+                ),
+              );
+            }
+            final resolution = workspaceResolution.requireValue;
+            if (!resolution.hasSelectedBusiness) {
+              _debugAuthGateDecision(
+                user: user,
+                requiresEmailVerification: false,
+                destination: 'WorkspaceOnboarding',
+              );
+              return _workspaceGateApp(
+                themeMode: themeMode,
+                uid: user.uid,
+                home: WorkspaceOnboardingPage(resolution: resolution),
+              );
+            }
+
             _debugAuthGateDecision(
               user: user,
               requiresEmailVerification: false,
@@ -278,7 +310,7 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
               theme: AppTheme.light,
               darkTheme: AppTheme.dark,
               themeMode: themeMode,
-              routerConfig: router,
+              routerConfig: ref.watch(appRouterProvider),
               debugShowCheckedModeBanner: false,
             );
           },
@@ -312,6 +344,88 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
           isTrueRoot: true,
           resetToken: 'auth-error',
           child: _AuthRefreshErrorPage(),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _workspaceGateApp({
+  required ThemeMode themeMode,
+  required String uid,
+  required Widget home,
+}) {
+  return MaterialApp(
+    scaffoldMessengerKey: rootScaffoldMessengerKey,
+    builder: _accountSwitchBuilder,
+    key: ValueKey('workspace-gate-$uid'),
+    title: 'Money Manager',
+    theme: AppTheme.light,
+    darkTheme: AppTheme.dark,
+    themeMode: themeMode,
+    debugShowCheckedModeBanner: false,
+    home: RootBackExitScope(
+      isTrueRoot: true,
+      resetToken: 'workspace-gate-$uid',
+      child: home,
+    ),
+  );
+}
+
+class _WorkspaceResolutionLoadingPage extends StatelessWidget {
+  const _WorkspaceResolutionLoadingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Checking your workspaces...'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceResolutionErrorPage extends StatelessWidget {
+  const _WorkspaceResolutionErrorPage({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.business_center_outlined, size: 48),
+              const SizedBox(height: 16),
+              Text(
+                'Your workspaces could not be checked',
+                style: Theme.of(context).textTheme.headlineSmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Check your connection and try again.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       ),
     );

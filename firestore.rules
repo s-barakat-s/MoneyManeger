@@ -2,16 +2,442 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return signedIn() && request.auth.uid == userId;
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
 
     function isVerified() {
-      return signedIn() && request.auth.token.email_verified == true;
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function membershipPath(businessId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid);
+    }
+
+    function rolePath(businessId, roleId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/roles/$(roleId);
+    }
+
+    function financialDocumentPath(businessId, collection, documentId) {
+      return /databases/$(database)/documents/businesses/$(businessId)/$(collection)/$(documentId);
+    }
+
+    function isBusinessMember(businessId) {
+      return isSignedIn()
+        && exists(membershipPath(businessId))
+        && get(membershipPath(businessId)).data.status == 'active';
+    }
+
+    function hasPermission(businessId, permission) {
+      return isBusinessMember(businessId)
+        && exists(rolePath(
+          businessId,
+          get(membershipPath(businessId)).data.roleId
+        ))
+        && permission in get(rolePath(
+          businessId,
+          get(membershipPath(businessId)).data.roleId
+        )).data.permissions;
+    }
+
+    function canOperateOnPayment(
+      businessId,
+      paymentData,
+      debtPermission,
+      receivablePermission
+    ) {
+      return paymentData.debtId is string
+        && (
+          (
+            exists(financialDocumentPath(
+              businessId,
+              'debts',
+              paymentData.debtId
+            ))
+            && hasPermission(businessId, debtPermission)
+          )
+          || (
+            exists(financialDocumentPath(
+              businessId,
+              'receivables',
+              paymentData.debtId
+            ))
+            && hasPermission(businessId, receivablePermission)
+          )
+        );
+    }
+
+    function canReadFinancialDocument(businessId, collection, data) {
+      return (
+        collection == 'owners'
+        && hasPermission(businessId, 'owners.read')
+      ) || (
+        collection == 'transactions'
+        && hasPermission(businessId, 'transactions.read')
+      ) || (
+        collection == 'transfers'
+        && hasPermission(businessId, 'transfers.read')
+      ) || (
+        collection == 'debts'
+        && hasPermission(businessId, 'debts.read')
+      ) || (
+        collection == 'receivables'
+        && hasPermission(businessId, 'receivables.read')
+      ) || (
+        collection == 'payments'
+        && canOperateOnPayment(
+          businessId,
+          data,
+          'debts.read',
+          'receivables.read'
+        )
+      ) || (
+        collection == 'assets'
+        && hasPermission(businessId, 'assets.read')
+      );
+    }
+
+    function canCreateFinancialDocument(businessId, collection, data) {
+      return (
+        collection == 'owners'
+        && hasPermission(businessId, 'owners.create')
+      ) || (
+        collection == 'transactions'
+        && hasPermission(businessId, 'transactions.create')
+      ) || (
+        collection == 'transfers'
+        && hasPermission(businessId, 'transfers.create')
+      ) || (
+        collection == 'debts'
+        && hasPermission(businessId, 'debts.create')
+      ) || (
+        collection == 'receivables'
+        && hasPermission(businessId, 'receivables.create')
+      ) || (
+        collection == 'payments'
+        && canOperateOnPayment(
+          businessId,
+          data,
+          'debts.update',
+          'receivables.update'
+        )
+      ) || (
+        collection == 'assets'
+        && hasPermission(businessId, 'assets.create')
+      );
+    }
+
+    function canUpdateFinancialDocument(businessId, collection, data) {
+      return (
+        collection == 'owners'
+        && hasPermission(businessId, 'owners.update')
+      ) || (
+        collection == 'transactions'
+        && hasPermission(businessId, 'transactions.update')
+      ) || (
+        collection == 'transfers'
+        && hasPermission(businessId, 'transfers.correct')
+      ) || (
+        collection == 'debts'
+        && hasPermission(businessId, 'debts.update')
+      ) || (
+        collection == 'receivables'
+        && hasPermission(businessId, 'receivables.update')
+      ) || (
+        collection == 'payments'
+        && canOperateOnPayment(
+          businessId,
+          data,
+          'debts.update',
+          'receivables.update'
+        )
+      ) || (
+        collection == 'assets'
+        && hasPermission(businessId, 'assets.update')
+      );
+    }
+
+    function canArchiveFinancialDocument(businessId, collection, data) {
+      return (
+        collection == 'owners'
+        && hasPermission(businessId, 'owners.archive')
+      ) || (
+        collection == 'transactions'
+        && hasPermission(businessId, 'transactions.archive')
+      ) || (
+        collection == 'transfers'
+        && hasPermission(businessId, 'transfers.archive')
+      ) || (
+        collection == 'debts'
+        && hasPermission(businessId, 'debts.archive')
+      ) || (
+        collection == 'receivables'
+        && hasPermission(businessId, 'receivables.archive')
+      ) || (
+        collection == 'payments'
+        && canOperateOnPayment(
+          businessId,
+          data,
+          'debts.archive',
+          'receivables.archive'
+        )
+      ) || (
+        collection == 'assets'
+        && hasPermission(businessId, 'assets.archive')
+      );
+    }
+
+    function canAppendActivity(businessId, data) {
+      return (
+        data.action == 'owner.created'
+        && hasPermission(businessId, 'owners.create')
+      ) || (
+        data.action == 'owner.updated'
+        && hasPermission(businessId, 'owners.update')
+      ) || (
+        data.action == 'owner.archived'
+        && hasPermission(businessId, 'owners.archive')
+      ) || (
+        data.action == 'transaction.created'
+        && hasPermission(businessId, 'transactions.create')
+      ) || (
+        data.action == 'transaction.updated'
+        && hasPermission(businessId, 'transactions.update')
+      ) || (
+        data.action == 'transaction.archived'
+        && hasPermission(businessId, 'transactions.archive')
+      ) || (
+        data.action == 'transfer.created'
+        && hasPermission(businessId, 'transfers.create')
+      ) || (
+        data.action == 'transfer.corrected'
+        && hasPermission(businessId, 'transfers.correct')
+      ) || (
+        data.action == 'transfer.archived'
+        && hasPermission(businessId, 'transfers.archive')
+      ) || (
+        data.action == 'debt.created'
+        && hasPermission(businessId, 'debts.create')
+      ) || (
+        data.action in ['debt.updated', 'debt.restored']
+        && hasPermission(businessId, 'debts.update')
+      ) || (
+        data.action == 'debt.archived'
+        && hasPermission(businessId, 'debts.archive')
+      ) || (
+        data.action == 'receivable.created'
+        && hasPermission(businessId, 'receivables.create')
+      ) || (
+        data.action in ['receivable.updated', 'receivable.restored']
+        && hasPermission(businessId, 'receivables.update')
+      ) || (
+        data.action == 'receivable.archived'
+        && hasPermission(businessId, 'receivables.archive')
+      ) || (
+        data.action in ['payment.created', 'payment.updated']
+        && data.metadata is map
+        && canOperateOnPayment(
+          businessId,
+          data.metadata,
+          'debts.update',
+          'receivables.update'
+        )
+      ) || (
+        data.action == 'payment.archived'
+        && data.metadata is map
+        && canOperateOnPayment(
+          businessId,
+          data.metadata,
+          'debts.archive',
+          'receivables.archive'
+        )
+      ) || (
+        data.action == 'asset.created'
+        && hasPermission(businessId, 'assets.create')
+      ) || (
+        data.action == 'asset.updated'
+        && hasPermission(businessId, 'assets.update')
+      ) || (
+        data.action == 'asset.archived'
+        && hasPermission(businessId, 'assets.archive')
+      );
+    }
+
+    function activityEntityMatchesAction(action, entityType) {
+      return (
+        action in ['owner.created', 'owner.updated', 'owner.archived']
+        && entityType == 'owner'
+      ) || (
+        action in [
+          'transaction.created',
+          'transaction.updated',
+          'transaction.archived'
+        ]
+        && entityType == 'transaction'
+      ) || (
+        action in [
+          'transfer.created',
+          'transfer.corrected',
+          'transfer.archived'
+        ]
+        && entityType == 'transfer'
+      ) || (
+        action in [
+          'debt.created',
+          'debt.updated',
+          'debt.archived',
+          'debt.restored'
+        ]
+        && entityType == 'debt'
+      ) || (
+        action in [
+          'receivable.created',
+          'receivable.updated',
+          'receivable.archived',
+          'receivable.restored'
+        ]
+        && entityType == 'receivable'
+      ) || (
+        action in ['payment.created', 'payment.updated', 'payment.archived']
+        && entityType == 'payment'
+      ) || (
+        action in ['asset.created', 'asset.updated', 'asset.archived']
+        && entityType == 'asset'
+      ) || (
+        action in [
+          'member.roleChanged',
+          'member.suspended',
+          'member.reactivated',
+          'member.removed',
+          'member.activated'
+        ]
+        && entityType == 'member'
+      ) || (
+        action in ['member.invited', 'invitation.revoked']
+        && entityType == 'invitation'
+      );
+    }
+
+    function hasValidActivityMetadata() {
+      return !request.resource.data.keys().hasAny(['metadata'])
+        || (
+          request.resource.data.metadata is map
+          && request.resource.data.metadata.keys().hasOnly([
+            'amount',
+            'purchasePrice',
+            'totalAmount',
+            'fromOwnerId',
+            'toOwnerId',
+            'ownerId',
+            'debtId',
+            'roleId',
+            'fromRoleId',
+            'toRoleId'
+          ])
+          && (
+            !request.resource.data.metadata.keys().hasAny(['amount'])
+            || request.resource.data.metadata.amount is number
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['purchasePrice'])
+            || request.resource.data.metadata.purchasePrice is number
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['totalAmount'])
+            || request.resource.data.metadata.totalAmount is number
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['fromOwnerId'])
+            || request.resource.data.metadata.fromOwnerId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['toOwnerId'])
+            || request.resource.data.metadata.toOwnerId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['ownerId'])
+            || request.resource.data.metadata.ownerId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['debtId'])
+            || request.resource.data.metadata.debtId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['roleId'])
+            || request.resource.data.metadata.roleId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['fromRoleId'])
+            || request.resource.data.metadata.fromRoleId is string
+          )
+          && (
+            !request.resource.data.metadata.keys().hasAny(['toRoleId'])
+            || request.resource.data.metadata.toRoleId is string
+          )
+        );
+    }
+
+    function hasValidCreateAudit() {
+      return request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time
+        && !request.resource.data.keys().hasAny([
+          'archivedAt',
+          'archivedBy'
+        ]);
+    }
+
+    function isArchiveTransition() {
+      return (
+        request.resource.data.get('isArchived', false) == true
+        && resource.data.get('isArchived', false) != true
+      ) || (
+        request.resource.data.get('status', '') == 'archived'
+        && resource.data.get('status', '') != 'archived'
+      );
+    }
+
+    function isRestoreTransition() {
+      return resource.data.get('status', '') == 'archived'
+        && request.resource.data.get('status', '') != 'archived';
+    }
+
+    function hasValidUpdateAudit() {
+      return request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time
+        && (
+          (
+            isArchiveTransition()
+            && request.resource.data.archivedBy == request.auth.uid
+            && request.resource.data.archivedAt == request.time
+          )
+          || (
+            isRestoreTransition()
+            && !request.resource.data.keys().hasAny([
+              'archivedAt',
+              'archivedBy'
+            ])
+          )
+          || (
+            !isArchiveTransition()
+            && !isRestoreTransition()
+            && request.resource.data.get('archivedBy', null)
+              == resource.data.get('archivedBy', null)
+            && request.resource.data.get('archivedAt', null)
+              == resource.data.get('archivedAt', null)
+          )
+        )
+        && (
+          resource.data.get('isArchived', false) != true
+          || request.resource.data.get('isArchived', false) == true
+        );
     }
 
     function hasKnownProfileFields() {
@@ -23,38 +449,43 @@ service cloud.firestore {
         'photoUrl',
         'provider',
         'providers',
+        'providerIds',
         'profileCompleted',
+        'businessName',
+        'activeBusinessId',
         'createdAt',
         'updatedAt'
       ]);
     }
 
-    match /users/{userId} {
-      allow read: if isOwner(userId);
+    match /userProfiles/{uid} {
+      allow read: if isSelf(uid);
 
-      allow create: if isOwner(userId)
-        && request.resource.data.uid == userId
+      allow create: if isSelf(uid)
+        && request.resource.data.uid == uid
+        && !request.resource.data.keys().hasAny(['activeBusinessId'])
         && hasKnownProfileFields();
 
-      allow update: if isOwner(userId)
+      allow update: if isSelf(uid)
         && hasKnownProfileFields()
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.get('activeBusinessId', null)
+          == resource.data.get('activeBusinessId', null)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'username',
           'displayName',
           'photoUrl',
           'provider',
           'providers',
-          'updatedAt',
-          'profileCompleted'
-        ])
-        && request.resource.data.uid == userId
-        && request.resource.data.uid == resource.data.uid
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.createdAt == resource.data.createdAt;
+          'providerIds',
+          'profileCompleted',
+          'businessName',
+          'activeBusinessId',
+          'updatedAt'
+        ]);
 
-      match /{collection}/{documentId}/{nestedDocument=**} {
-        allow read, write: if isOwner(userId);
-      }
+      allow delete: if false;
     }
 
     match /usernames/{username} {
@@ -63,11 +494,7 @@ service cloud.firestore {
       allow create: if isVerified()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.username == username
-        && request.resource.data.keys().hasAll([
-          'uid',
-          'username',
-          'createdAt'
-        ])
+        && request.resource.data.keys().hasAll(['uid', 'username', 'createdAt'])
         && request.resource.data.keys().hasOnly([
           'uid',
           'username',
@@ -91,8 +518,183 @@ service cloud.firestore {
           'updatedAt'
         ]);
 
-      allow delete: if isVerified()
-        && resource.data.uid == request.auth.uid;
+      allow delete: if isVerified() && resource.data.uid == request.auth.uid;
+    }
+
+    match /businesses/{businessId} {
+      allow get: if isBusinessMember(businessId);
+      allow list: if isBusinessMember(businessId);
+
+      // Workspace creation is an authenticated callable operation so the
+      // Business, roles, owner membership, profile pointer, and activity event
+      // can be committed atomically with a generated Business ID.
+      allow create: if false;
+
+      allow update: if hasPermission(businessId, 'business.settings')
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.schemaVersion == resource.data.schemaVersion
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow get: if hasPermission(businessId, 'members.read') || isSelf(uid);
+        allow list: if hasPermission(businessId, 'members.read');
+
+        allow create: if false;
+
+        allow update, delete: if false;
+      }
+
+      match /roles/{roleId} {
+        allow get: if hasPermission(businessId, 'roles.read')
+          || (
+            isBusinessMember(businessId)
+            && roleId == get(membershipPath(businessId)).data.roleId
+          );
+        allow list: if hasPermission(businessId, 'roles.read');
+
+        allow create: if request.resource.data.id == roleId
+          && request.resource.data.name is string
+          && request.resource.data.permissions is list
+          && request.resource.data.isSystem is bool
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.keys().hasOnly([
+            'id',
+            'name',
+            'permissions',
+            'isSystem',
+            'createdAt',
+            'updatedAt'
+          ])
+          && hasPermission(businessId, 'roles.manage')
+          && request.resource.data.isSystem == false;
+
+        allow update: if hasPermission(businessId, 'roles.manage')
+          && resource.data.isSystem == false
+          && request.resource.data.isSystem == false
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.name is string
+          && request.resource.data.permissions is list
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.keys().hasOnly([
+            'id',
+            'name',
+            'permissions',
+            'isSystem',
+            'createdAt',
+            'updatedAt'
+          ]);
+
+        allow delete: if false;
+      }
+
+      // Invitation discovery and every state transition are handled by
+      // authenticated callable Functions. No Business invitation is exposed
+      // through a global or collection-group client rule.
+      match /invitations/{invitationId} {
+        allow read, write: if false;
+      }
+
+      match /invitationEmailIndex/{indexId} {
+        allow read, write: if false;
+      }
+
+      match /activityLogs/{activityId} {
+        allow read: if hasPermission(businessId, 'activity.read');
+
+        allow create: if canAppendActivity(businessId, request.resource.data)
+          && request.resource.data.id == activityId
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.entityType is string
+          && request.resource.data.entityId is string
+          && request.resource.data.entityId.size() > 0
+          && activityEntityMatchesAction(
+            request.resource.data.action,
+            request.resource.data.entityType
+          )
+          && hasValidActivityMetadata()
+          && request.resource.data.keys().hasOnly([
+            'id',
+            'actorUid',
+            'action',
+            'entityType',
+            'entityId',
+            'createdAt',
+            'metadata'
+          ]);
+
+        allow update, delete: if false;
+      }
+
+      match /{financialCollection}/{documentId} {
+        allow read: if financialCollection in [
+          'owners',
+          'transactions',
+          'transfers',
+          'debts',
+          'receivables',
+          'payments',
+          'assets'
+        ] && canReadFinancialDocument(
+          businessId,
+          financialCollection,
+          resource.data
+        );
+
+        allow create: if financialCollection in [
+          'owners',
+          'transactions',
+          'transfers',
+          'debts',
+          'receivables',
+          'payments',
+          'assets'
+        ]
+          && canCreateFinancialDocument(
+            businessId,
+            financialCollection,
+            request.resource.data
+          )
+          && hasValidCreateAudit();
+
+        allow update: if financialCollection in [
+          'owners',
+          'transactions',
+          'transfers',
+          'debts',
+          'receivables',
+          'payments',
+          'assets'
+        ]
+          && (
+            isArchiveTransition()
+              ? canArchiveFinancialDocument(
+                  businessId,
+                  financialCollection,
+                  request.resource.data
+                )
+              : canUpdateFinancialDocument(
+                  businessId,
+                  financialCollection,
+                  request.resource.data
+                )
+          )
+          && hasValidUpdateAudit();
+
+        // Current repositories use auditable soft deletion/archive updates.
+        allow delete: if false;
+      }
+    }
+
+    // The obsolete user-owned hierarchy is intentionally inaccessible.
+    match /users/{document=**} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

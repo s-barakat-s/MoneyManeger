@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'audit_metadata.dart';
+
 part 'company_asset.freezed.dart';
 part 'company_asset.g.dart';
 
@@ -13,8 +15,8 @@ abstract class CompanyAsset with _$CompanyAsset {
     required AssetCategory category,
     required double purchasePrice,
     required DateTime purchaseDate,
-    required DateTime createdAt,
     String? note,
+    @Default(AuditMetadata()) AuditMetadata audit,
   }) = _CompanyAsset;
 
   factory CompanyAsset.fromJson(Map<String, dynamic> json) =>

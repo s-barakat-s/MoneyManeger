@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/data/firestore_paths.dart';
+
 abstract interface class AccountSwitcher {
   Future<AuthenticatedAccount> switchGoogleAccount();
   Future<AuthenticatedAccount> switchPasswordAccount({
@@ -391,9 +393,9 @@ class AuthService implements AccountSwitcher {
     }
 
     final firestore = FirebaseFirestore.instance;
-    final profileRef = firestore.collection('users').doc(user.uid);
+    final profileRef = FirestorePaths.userProfile(firestore, user.uid);
     final newUsernameRef = firestore
-        .collection('usernames')
+        .collection(FirestoreCollections.usernames)
         .doc(normalizedUsername);
 
     if (kDebugMode) debugPrint('Username change transaction started.');
@@ -414,7 +416,9 @@ class AuthService implements AccountSwitcher {
         DocumentSnapshot<Map<String, dynamic>>? oldReservation;
         DocumentReference<Map<String, dynamic>>? oldUsernameRef;
         if (oldUsername != null && oldUsername.isNotEmpty) {
-          oldUsernameRef = firestore.collection('usernames').doc(oldUsername);
+          oldUsernameRef = firestore
+              .collection(FirestoreCollections.usernames)
+              .doc(oldUsername);
           oldReservation = await transaction.get(oldUsernameRef);
         }
 
@@ -462,9 +466,9 @@ class AuthService implements AccountSwitcher {
     );
     final firestore = FirebaseFirestore.instance;
     final usernameRef = firestore
-        .collection('usernames')
+        .collection(FirestoreCollections.usernames)
         .doc(normalizedUsername);
-    final profileRef = firestore.collection('users').doc(user.uid);
+    final profileRef = FirestorePaths.userProfile(firestore, user.uid);
 
     if (kDebugMode) {
       debugPrint('Username profile transaction started.');

@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'audit_metadata.dart';
+
 part 'debt_payment.freezed.dart';
 part 'debt_payment.g.dart';
 
@@ -12,6 +14,7 @@ abstract class DebtPayment with _$DebtPayment {
     required double amount,
     required DateTime date,
     String? note,
+    @Default(AuditMetadata()) AuditMetadata audit,
   }) = _DebtPayment;
 
   factory DebtPayment.fromJson(Map<String, dynamic> json) =>

@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/data/firestore_paths.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_shadows.dart';
@@ -20,6 +23,8 @@ import '../../auth/application/unauthenticated_entry_controller.dart';
 import '../../auth/application/account_switch_controller.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/account_switcher_bottom_sheet.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({required this.currentLocation, super.key});
@@ -78,6 +83,10 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     final hasPassword = currentUser.providerData.any(
       (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
     );
+    final canReadMembers =
+        ref.watch(canProvider(Permission.membersRead)).value == true;
+    final canReadActivity =
+        ref.watch(canProvider(Permission.activityRead)).value == true;
 
     return RefreshIndicator(
       onRefresh: _refresh,
@@ -95,6 +104,45 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             email: email,
             photoUrl: widget.user.photoURL,
             onEdit: () => _showEditProfileDialog(context, name),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('Business'),
+          const SizedBox(height: AppSpacing.sm),
+          _SettingsCard(
+            child: Column(
+              children: [
+                if (canReadMembers) ...[
+                  _SettingsTile(
+                    icon: Icons.groups_rounded,
+                    iconColor: AppColors.primary,
+                    title: 'Business members',
+                    subtitle: 'View roles and team access.',
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => context.push(AppRoute.members.path),
+                  ),
+                  const Divider(height: AppSpacing.xl),
+                ],
+                if (canReadActivity) ...[
+                  _SettingsTile(
+                    icon: Icons.history_rounded,
+                    iconColor: AppColors.primary,
+                    title: 'Activity',
+                    subtitle: 'Review Business changes and team actions.',
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => context.push(AppRoute.activity.path),
+                  ),
+                  const Divider(height: AppSpacing.xl),
+                ],
+                _SettingsTile(
+                  icon: Icons.mark_email_unread_outlined,
+                  iconColor: AppColors.info,
+                  title: 'Invitations',
+                  subtitle: 'View invitations sent to your account.',
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push(AppRoute.invitations.path),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
           const _SectionTitle('Appearance'),
@@ -195,10 +243,10 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       await auth.currentUser?.reload();
       final refreshedUser = auth.currentUser;
       if (refreshedUser != null) {
-        await firestore
-            .collection('users')
-            .doc(refreshedUser.uid)
-            .get(const GetOptions(source: Source.server));
+        await FirestorePaths.userProfile(
+          firestore,
+          refreshedUser.uid,
+        ).get(const GetOptions(source: Source.server));
       }
       if (mounted) setState(() {});
     } catch (error) {

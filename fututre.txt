@@ -1,272 +1,1934 @@
-دي الخطة اللي أنصح نمشي عليها من دلوقتي لحد ما يبقى نظام الـAuthentication مكتمل 100%، وكل خطوة مستقلة وسهلة الاختبار.
+# MONEY MANAGER — MASTER PROJECT HANDOFF
+
+> هذا المستند هو الـcontext الكامل لخطة تطوير Money Manager الحالية.
+> إذا بدأنا Chat جديد، اقرأ هذا المستند بالكامل أولًا، ولا تعيد الخطوات المنفذة.
+>
+> **Current stopping point: STEP 6 COMPLETED.**
+>
+> الخطوة التالية هي:
+>
+> **STEP 7 + STEP 8 — Member Management / Invitations + Permission-aware UI**
 
 ---
 
-# ✅ المرحلة 1 — الأساسيات (خلصت)
+# 1. PROJECT OVERVIEW
 
-* ✅ إنشاء Firebase Project جديد
-* ✅ Firebase Auth (Email/Password)
-* ✅ Firestore
-* ✅ Firestore Rules
-* ✅ AuthGate
-* ✅ Login
-* ✅ Logout
-* ✅ Session Persistence
-* ✅ User Profile
-* ✅ Username Reservation
-* ✅ منع تكرار Username
-* ✅ تنظيف حساب Auth عند فشل التسجيل
+المشروع اسمه:
 
----
+**Money Manager**
 
-# 🚧 المرحلة 2 — تحسين تجربة تسجيل الدخول
+وهو Flutter application لإدارة البيانات المالية.
 
-## 2.1 Login بالإيميل فقط (مؤقتًا)
+التقنيات الأساسية:
 
-* ✅ Username يفضل موجود أثناء التسجيل.
-* ✅ Login بالإيميل فقط.
-* ✅ تجهيز كود Username Login للمستقبل.
+* Flutter
+* Dart
+* Firebase Authentication
+* Cloud Firestore
+* Riverpod
+* GoRouter
+* Freezed
+* JSON Serialization
 
----
+التطبيق حاليًا:
 
-## 2.2 Google Sign-In ⭐
+**Pre-production**
 
-### Android
+أي:
 
-* إضافة SHA-1 وSHA-256.
-* تفعيل Google Provider.
-* تسجيل الدخول بحساب Google.
+* لم يتم إطلاقه للمستخدمين الحقيقيين.
+* لا توجد production data مهمة.
+* لا توجد production users يجب الحفاظ على schema قديمة من أجلهم.
 
-### Web
+لذلك أثناء مرحلة التأسيس الحالية يمكن عمل clean breaking schema changes إذا كانت ستؤدي إلى architecture أفضل.
 
-* التأكد إنه يعمل على الويب.
-
-### بعد أول Login
-
-إذا كان أول مرة:
-
-```
-Google Login
-      ↓
-Choose Username
-      ↓
-Create users/{uid}
-      ↓
-Reserve username
-      ↓
-Home
-```
-
-إذا كان مستخدم قديم:
-
-```
-Google Login
-      ↓
-Home
-```
+لكن الهدف النهائي أن يصبح التطبيق بعد الإطلاق قابلًا للتطوير بدون تكسير بيانات المستخدمين.
 
 ---
 
-## 2.3 ربط الحسابات (Account Linking)
+# 2. MAIN PRODUCT DIRECTION
 
-لو نفس الإيميل موجود بالفعل:
+الهدف هو تحويل Money Manager من تطبيق مالي لحساب مستخدم واحد إلى نظام أقرب إلى:
 
+**Business / Company Workspace**
+
+بحيث:
+
+```text
+Business
+│
+├── Owner
+├── Admin
+├── Accountant
+├── Viewer
+└── Future Custom Roles
 ```
-Email Account
+
+كل شخص يدخل بحسابه الخاص.
+
+ممنوع architecture تعتمد على مشاركة نفس Login بين عدة Admins.
+
+---
+
+# 3. CORE MULTI-USER PRINCIPLE
+
+كل شخص حقيقي له:
+
+```text
+Firebase Auth User
+        │
+        │ UID
+        ▼
+User Profile
+        │
+        ▼
+Business Membership
+        │
+        ▼
+Business
+```
+
+مثال:
+
+```text
+Mahmoud
+Firebase UID = uid_1
+
+Ahmed
+Firebase UID = uid_2
+
+Youssef
+Firebase UID = uid_3
+```
+
+الثلاثة يمكن أن يعملوا على:
+
+```text
+Business ABC
+```
+
+لكن كل واحد يحتفظ بهويته المستقلة.
+
+وبالتالي نقدر نعرف:
+
+```text
+Ahmed created transaction X
+
+Mahmoud updated transaction X
+
+Youssef created payment Y
+```
+
+---
+
+# 4. BUSINESS IS THE DATA BOUNDARY
+
+البيانات المالية Business-scoped.
+
+Firestore conceptually:
+
+```text
+businesses/{businessId}
+│
+├── members/{uid}
+├── roles/{roleId}
+├── activityLogs/{activityId}
+│
+├── owners/{id}
+├── transactions/{id}
+├── transfers/{id}
+├── debts/{id}
+├── receivables/{id}
+├── payments/{id}
+└── assets/{id}
+```
+
+Business isolation يجب أن يظل قاعدة أساسية في المشروع.
+
+---
+
+# 5. LONG-TERM ARCHITECTURE GOALS
+
+المشروع يجب أن يكون قابلًا مستقبلًا لـ:
+
+* multiple admins
+* multiple businesses per user
+* custom roles
+* custom permissions
+* member invitations
+* suspension/removal
+* audit history
+* schema migrations
+* backward compatibility
+* new financial modules
+* safe production evolution
+
+بدون إعادة تصميم النظام من الصفر.
+
+---
+
+# 6. IMPORTANT CODEX RULE
+
+كل Prompt لكوديكس يجب أن يتبع القاعدة:
+
+> **Save credits on exploration, NOT on engineering quality.**
+
+يعني:
+
+نقلل:
+
+* repository-wide scans
+* full builds
+* broad analyzes
+* full test suites
+* unrelated exploration
+* unnecessary commands
+
+لكن لا نقلل:
+
+* clean architecture
+* file separation
+* type safety
+* security
+* maintainability
+* naming quality
+* separation of concerns
+
+لو التنفيذ الصحيح يحتاج 5 ملفات بدل ملف واحد:
+
+**اعمل الـ5 ملفات.**
+
+ممنوع God Files لمجرد توفير credits.
+
+---
+
+# 7. VERIFICATION POLICY
+
+لا تطلب من Codex بشكل تلقائي:
+
+```text
+flutter build
+flutter analyze
+flutter test
+```
+
+على المشروع كله.
+
+الأفضل:
+
+```text
+git diff --check
+```
+
+مع:
+
+* targeted analysis
+* targeted searches
+* focused tests
+* code generation فقط للملفات المطلوبة
+
+لو test/tooling علق بدون output:
+
+يتم إيقافه وعدم استهلاك وقت في debugging للبنية نفسها إلا لو المشكلة مرتبطة مباشرة بالتغيير.
+
+---
+
+# ==============================
+
+# COMPLETED WORK
+
+# ==============================
+
+# STEP 1 — BUSINESS MEMBERSHIP FOUNDATION
+
+## STATUS
+
+**COMPLETED**
+
+تم تحويل BusinessMember إلى membership حقيقية بين User وBusiness.
+
+الشكل الحالي:
+
+```text
+BusinessMember
+
+uid: String
+roleId: String
+status: MembershipStatus
+
+joinedAt: DateTime?
+invitedAt: DateTime?
+invitedBy: String?
+
+createdAt: DateTime?
+updatedAt: DateTime?
+```
+
+---
+
+## Membership Status
+
+الحالات:
+
+```text
+invited
+active
+suspended
+removed
+```
+
+### invited
+
+تمت دعوة الشخص ولكن لم يصبح عضوًا فعالًا بعد.
+
+### active
+
+عضو فعال.
+
+### suspended
+
+عضويته موجودة لكن الوصول متوقف مؤقتًا.
+
+### removed
+
+لم يعد عضوًا لكن record الخاص به لا يتم حذفه حتى نحافظ على التاريخ.
+
+---
+
+## Role Reference
+
+BusinessMember لا يحتوي:
+
+```text
+isAdmin
+isOwner
+```
+
+بل:
+
+```text
+roleId
+```
+
+مثال:
+
+```text
+roleId = owner
+roleId = accountant
+```
+
+---
+
+## Owner Bootstrap
+
+العضو الأول:
+
+```text
+businesses/{businessId}/members/{ownerUid}
+```
+
+ويتم إنشاؤه:
+
+```text
+uid = authenticated UID
+roleId = owner
+status = active
+```
+
+---
+
+# STEP 2 — ROLES & PERMISSIONS FOUNDATION
+
+## STATUS
+
+**COMPLETED**
+
+تم بناء permission-based authorization foundation.
+
+---
+
+## Permission
+
+تم إنشاء typed Permission catalog.
+
+Persisted identifiers:
+
+```text
+members.read
+members.manage
+
+roles.read
+roles.manage
+
+owners.read
+owners.create
+owners.update
+owners.archive
+
+transactions.read
+transactions.create
+transactions.update
+transactions.archive
+
+transfers.read
+transfers.create
+transfers.correct
+transfers.archive
+
+debts.read
+debts.create
+debts.update
+debts.archive
+
+receivables.read
+receivables.create
+receivables.update
+receivables.archive
+
+assets.read
+assets.create
+assets.update
+assets.archive
+
+reports.read
+
+business.settings
+```
+
+ملاحظة:
+
+`owners.*` و `transfers.archive` تمت إضافتهم لاحقًا في Step 6.
+
+---
+
+## Permission Serialization
+
+Dart يستخدم typed permissions مثل:
+
+```dart
+Permission.transactionsCreate
+```
+
+Firestore يستخدم stable identifier:
+
+```text
+transactions.create
+```
+
+Unknown future permission strings يتم تجاهلها بأمان من clients أقدم بدل crash.
+
+---
+
+# BusinessRole
+
+الشكل الحالي:
+
+```text
+BusinessRole
+
+id: String
+name: String
+permissions: Set<Permission>
+isSystem: bool
+
+createdAt: DateTime?
+updatedAt: DateTime?
+```
+
+---
+
+# System Roles
+
+لدينا:
+
+```text
+owner
+admin
+accountant
+viewer
+```
+
+وكلهم:
+
+```text
+isSystem = true
+```
+
+---
+
+## Owner
+
+يمتلك كل:
+
+```text
+Permission.values
+```
+
+---
+
+## Admin
+
+صلاحيات تشغيل وإدارة واسعة.
+
+حاليًا كل الصلاحيات تقريبًا باستثناء:
+
+```text
+roles.manage
+```
+
+Important future review:
+
+Owner من الطبيعي أن يحصل على كل Permission جديدة.
+
+لكن يجب الانتباه مستقبلًا ألا يحصل Admin تلقائيًا على Permission جديدة حساسة بدون قرار مقصود.
+
+---
+
+## Accountant
+
+Finance-oriented permissions.
+
+يستطيع عمليات مالية محددة.
+
+لا يمتلك بشكل افتراضي:
+
+* member management
+* role management
+* business settings
+* archive/correction privileges التي لم تمنح له
+
+---
+
+## Viewer
+
+Read-only.
+
+---
+
+# BusinessAccess
+
+تم إنشاء authorization abstraction.
+
+Concept:
+
+```text
+BusinessMember
+      ↓ roleId
+BusinessRole
+      ↓
+permissions
+      ↓
+BusinessAccess
+      ↓
+can(Permission.x)
+```
+
+بدل:
+
+```dart
+roleId == "owner"
+```
+
+---
+
+# Riverpod Permission Resolution
+
+Flow:
+
+```text
+Authenticated UID
+        ↓
+Active Business
+        ↓
+BusinessMember
+        ↓
+roleId
+        ↓
+BusinessRole
+        ↓
+BusinessAccess
+        ↓
+can(...)
+```
+
+Inactive/missing/malformed membership:
+
+```text
+DENIED
+```
+
+---
+
+# Role Storage
+
+Firestore:
+
+```text
+businesses/{businessId}/roles/{roleId}
+```
+
+System roles:
+
+```text
+roles/owner
+roles/admin
+roles/accountant
+roles/viewer
+```
+
+---
+
+# Role Provisioning
+
+عند إنشاء Business يتم إنشاء system roles.
+
+Provisioning:
+
+**idempotent**
+
+يعني التشغيل أكثر من مرة لا:
+
+* يكرر roles
+* يمسح custom data
+* يعيد ضبط role موجود بلا داعٍ
+
+---
+
+# STEP 3 — INDEPENDENT MEMBER IDENTITY
+
+## STATUS
+
+**COMPLETED**
+
+كل human member أصبح معتمدًا على Firebase UID الخاص به.
+
+---
+
+# Canonical Actor Identity
+
+الـUID هو الهوية الرسمية لأي actor.
+
+Flow:
+
+```text
+Firebase Auth UID
+        ↓
+requireAuthenticatedActorUid(...)
+        ↓
+authenticatedActorUidProvider
+        ↓
+repository actingUid
+```
+
+Repositories لا تستدعي FirebaseAuth عشوائيًا.
+
+Actor identity يتم inject لها.
+
+---
+
+# Important Business ID Fix
+
+تم إزالة الاعتماد الطبيعي على:
+
+```text
+currentUser.uid == businessId
+```
+
+الـactiveBusinessId يمكن أن يكون Business آخر بشرط أن المستخدم لديه active membership فيه.
+
+UID == Business ID مازال فقط في:
+
+**deterministic initial bootstrap**
+
+وده مهم جدًا لدعم:
+
+```text
+User A → Business X
+User B → same Business X
+```
+
+وكذلك مستقبلًا:
+
+```text
+User A → Business X + Business Y
+```
+
+---
+
+# UserProfile vs BusinessMember
+
+المفهومان منفصلان.
+
+UserProfile:
+
+```text
+human/account identity
+```
+
+BusinessMember:
+
+```text
+relationship with Business
+```
+
+لا يتم تخزين permissions أو membership status داخل UserProfile.
+
+---
+
+# STEP 4 — UNIFIED AUDIT METADATA
+
+## STATUS
+
+**COMPLETED**
+
+تم إنشاء:
+
+```text
+AuditMetadata
+```
+
+Shared Freezed value object.
+
+---
+
+## Fields
+
+```text
+createdAt
+createdBy
+
+updatedAt
+updatedBy
+
+archivedAt
+archivedBy
+```
+
+---
+
+# Applied To
+
+تم تطبيقه على persisted financial models مثل:
+
+* Owner / money holder
+* Transaction
+* Transfer
+* Debt
+* DebtPayment
+* Receivable paths
+* CompanyAsset
+
+---
+
+# Firestore Shape
+
+Domain:
+
+```text
+AuditMetadata object
+```
+
+لكن Firestore fields تظل flat:
+
+```text
+createdAt
+createdBy
+updatedAt
+updatedBy
+archivedAt
+archivedBy
+```
+
+وده مقصود لتبسيط:
+
+* Firestore Rules
+* queries
+* writes
+
+---
+
+# Create Behavior
+
+```text
+createdBy = actor UID
+createdAt = server timestamp
+
+updatedBy = actor UID
+updatedAt = server timestamp
+```
+
+---
+
+# Update Behavior
+
+يحافظ على:
+
+```text
+createdBy
+createdAt
+```
+
+ويغير فقط:
+
+```text
+updatedBy
+updatedAt
+```
+
+---
+
+# Archive Behavior
+
+```text
+archivedBy = actor UID
+archivedAt = server timestamp
+
+updatedBy = actor UID
+updatedAt = server timestamp
+```
+
+لا يوجد hard delete للـfinancial records.
+
+---
+
+# Firestore Audit Security
+
+Rules تمنع تزوير:
+
+```text
+createdBy
+updatedBy
+archivedBy
+```
+
+ويجب أن actor UID يطابق:
+
+```text
+request.auth.uid
+```
+
+Creator metadata immutable بعد الإنشاء.
+
+---
+
+# Payment Atomicity
+
+Debt/Receivable repayment مازال Firestore transaction atomic.
+
+العملية تشمل:
+
+```text
+Payment
 +
-Google Account
-↓
-
-linkWithCredential()
-
-↓
-
-Firebase UID واحد
+Debt/Receivable balance update
++
+Generated Transaction
 ```
 
-بحيث يبقى للمستخدم حساب واحد فقط.
+وكلهم يستخدمون نفس authenticated actor UID.
 
 ---
 
-# 📧 المرحلة 3 — Email Verification
+# STEP 5 — IMMUTABLE ACTIVITY LOG
 
-للمستخدمين الذين سجلوا بالإيميل:
+## STATUS
 
-```
-Register
-↓
+**COMPLETED**
 
-Create Auth User
-
-↓
-
-Create Firestore Profile
-
-↓
-
-sendEmailVerification()
-
-↓
-
-Verification Screen
-
-↓
-
-Reload User
-
-↓
-
-emailVerified == true
-
-↓
-
-Home
-```
-
-### المطلوب
-
-* صفحة Verify Email.
-* زر Resend Email.
-* زر Refresh.
-* منع الدخول قبل التحقق.
+تم إنشاء Business-scoped Activity Log.
 
 ---
 
-# 🔑 المرحلة 4 — Forgot Password
+# Storage
 
-من صفحة Login:
-
+```text
+businesses/{businessId}/activityLogs/{activityId}
 ```
-Forgot Password
 
-↓
+---
 
-Enter Email
+# Activity Log Model
 
-↓
+Fields:
 
-Reset Email
-
-↓
-
-Success Screen
+```text
+id
+actorUid
+action
+entityType
+entityId
+createdAt
+metadata
 ```
+
+`action` و `entityType` typed.
+
+Domain model Firestore-independent.
+
+Firestore implementation في:
+
+```text
+FirestoreActivityLogWriter
+```
+
+---
+
+# Activity Actions Implemented
+
+```text
+owner.created
+owner.updated
+owner.archived
+
+transaction.created
+transaction.updated
+transaction.archived
+
+transfer.created
+transfer.corrected
+transfer.archived
+
+debt.created
+debt.updated
+debt.archived
+debt.restored
+
+receivable.created
+receivable.updated
+receivable.archived
+receivable.restored
+
+payment.created
+payment.updated
+payment.archived
+
+asset.created
+asset.updated
+asset.archived
+```
+
+---
+
+# Activity Log Immutability
+
+Activity Logs:
+
+```text
+CREATE   allowed when authorized
+UPDATE   DENIED
+DELETE   DENIED
+```
+
+حتى Owner لا يعدل التاريخ.
+
+---
+
+# Atomic Logging
+
+كل financial write حاليًا يعمل:
+
+```text
+Financial Write
++
+Activity Log
+```
+
+atomically.
+
+يعني لا يحدث:
+
+```text
+Transaction created
+لكن log ضاع
+```
+
+أو:
+
+```text
+Log says created
+لكن transaction failed
+```
+
+---
+
+# Repayment Activity
+
+Repayment transaction يحتفظ بـatomicity:
+
+```text
+Payment creation
++
+Debt/Receivable balance update
++
+Generated Transaction
++
+one high-level payment.created Activity
+```
+
+تم تجنب noisy duplicate logs لنفس user action.
+
+---
+
+# STEP 6 — FINANCIAL PERMISSION ENFORCEMENT
+
+## STATUS
+
+**COMPLETED**
+
+تم إزالة temporary owner-only financial authorization.
+
+الـfinancial operations الآن تعتمد على:
+
+```text
+active membership
++
+Permission
+```
+
+وليس:
+
+```text
+owner || admin
+```
+
+---
+
+# Financial Permission Mapping
+
+## Money Holders / Owners
+
+تم إضافة:
+
+```text
+owners.read
+owners.create
+owners.update
+owners.archive
+```
+
+---
+
+## Transactions
+
+```text
+transactions.read
+transactions.create
+transactions.update
+transactions.archive
+```
+
+---
+
+## Transfers
+
+```text
+transfers.read
+transfers.create
+transfers.correct
+transfers.archive
+```
+
+---
+
+## Debts
+
+```text
+debts.read
+debts.create
+debts.update
+debts.archive
+```
+
+---
+
+## Receivables
+
+```text
+receivables.read
+receivables.create
+receivables.update
+receivables.archive
+```
+
+---
+
+## Assets
+
+```text
+assets.read
+assets.create
+assets.update
+assets.archive
+```
+
+---
+
+## Reports
+
+```text
+reports.read
+```
+
+Reports نفسها لم يتم تنفيذها.
+
+---
+
+# Payment Authorization
+
+Payments تستخدم permission الخاصة بالـDebt أو Receivable المرتبط بها بدل permission family غير ضرورية.
+
+---
+
+# Firestore Security Current Rule
+
+Normal financial operation requires:
+
+```text
+Authenticated
++
+Active BusinessMember
++
+Required Permission
++
+Valid Audit Attribution
+```
+
+Conceptually:
+
+```text
+status == active
+AND
+hasPermission("transactions.create")
+AND
+createdBy == request.auth.uid
+AND
+correct server timestamp
+```
+
+---
+
+# Suspended Member
+
+حتى لو Role عنده كل permissions:
+
+```text
+status = suspended
+```
+
+→ normal access denied.
+
+نفس الشيء:
+
+```text
+invited
+removed
+```
+
+---
+
+# Remaining Owner Checks
+
+Role-name checks للـOwner موجودة فقط في:
+
+* initial Business provisioning
+* initial Member provisioning
+* initial system-role bootstrap
+* security invariants المتعلقة بمالك الـBusiness
+
+لا يوجد owner/admin shortcut للعمليات المالية الطبيعية.
+
+---
+
+# IMPORTANT DEVELOPMENT NOTE
+
+لأن المشروع pre-production ولم ننشئ migration framework بعد:
+
+**development Business role documents التي تم إنشاؤها قبل Step 6 قد تحتاج reset/reseed.**
+
+السبب أن permission catalog اتغير بإضافة:
+
+```text
+owners.*
+transfers.archive
+```
+
+قبل اختبار roles فعليًا، تأكد أن development roles تستخدم defaults الجديدة.
+
+---
+
+# ==============================
+
+# CURRENT STATUS
+
+# ==============================
+
+لقد أكملنا:
+
+```text
+STEP 1  Business Membership Foundation       ✅
+
+STEP 2  Roles & Permissions Foundation       ✅
+
+STEP 3  Independent Member Identity          ✅
+
+STEP 4  Unified Audit Metadata               ✅
+
+STEP 5  Immutable Activity Log               ✅
+
+STEP 6  Financial Permission Enforcement     ✅
+```
+
+بالتالي:
+
+**الـbackend/data/security foundation الخاص بالـMulti-Admin system شبه مكتمل.**
+
+لكن الـfeature ليست مكتملة end-to-end للمستخدم حتى الآن.
+
+---
+
+# ==============================
+
+# NEXT WORK
+
+# ==============================
+
+# STEP 7 — MEMBER MANAGEMENT + INVITATIONS
+
+## STATUS
+
+**NOT STARTED**
+
+دي أهم خطوة تالية.
+
+الهدف أن Owner/Admin المصرح له يقدر فعليًا يدير فريق الشركة.
+
+نحتاج:
+
+```text
+Members Screen
+```
+
+تعرض أعضاء الـBusiness.
+
+---
+
+## Member Operations
+
+نحتاج flows لـ:
+
+```text
+Invite Member
+Change Role
+Suspend Member
+Reactivate Member
+Remove Member
+```
+
+---
+
+# Invitation Flow
+
+المستخدم الجديد يجب ألا يستخدم حساب Owner.
+
+السيناريو:
+
+```text
+Mahmoud = Owner
+
+Mahmoud invites:
+ahmed@example.com
+
+        ↓
+
+Invitation created
+
+        ↓
+
+Ahmed signs in / creates his own Firebase account
+
+        ↓
+
+Ahmed accepts invitation
+
+        ↓
+
+BusinessMember created/activated
+
+uid = Ahmed Firebase UID
+roleId = selected role
+status = active
+
+        ↓
+
+Ahmed accesses same Business
+```
+
+---
+
+# Invitation Security
+
+يجب منع:
+
+* قبول دعوة تخص email/user آخر
+* استخدام invitation أكثر من مرة
+* استخدام invitation ملغية/منتهية
+* member غير مصرح له من دعوة الآخرين
+* تغيير role بدون `members.manage` / relevant authorization
+
+التصميم الفعلي يتم تحديده في Step 7.
+
+---
+
+# Member Removal
+
+لا يتم حذف BusinessMember.
+
+بدلًا من ذلك:
+
+```text
+status = removed
+```
+
+حتى تظل Activity Logs القديمة قابلة للربط بـUID.
+
+---
+
+# Suspend
+
+```text
+status = suspended
+```
+
+وبالتالي Firestore Rules الحالية تمنع access تلقائيًا.
+
+---
+
+# Role Change
+
+مثال:
+
+```text
+Ahmed
+
+before:
+roleId = admin
+
+after:
+roleId = viewer
+```
+
+ويجب تسجيل:
+
+```text
+member.roleChanged
+```
+
+في Activity Log.
+
+---
+
+# Member Administrative Activity
+
+Step 7 يجب أن يربط member operations بالـActivity Log.
+
+مثل:
+
+```text
+member.invited
+member.activated
+member.roleChanged
+member.suspended
+member.reactivated
+member.removed
+```
+
+حسب الـflows الفعلية.
+
+---
+
+# STEP 8 — PERMISSION-AWARE UI
+
+## STATUS
+
+**NOT STARTED**
+
+Firestore حاليًا تحمي البيانات، لكن UI تحتاج تعكس permissions.
+
+مثال:
+
+Viewer:
+
+```text
+View Transactions     ✅
+Add Transaction       ❌
+Edit Transaction      ❌
+Archive Transaction   ❌
+```
+
+Accountant:
+
+```text
+Add Transaction       ✅
+Edit Transaction      ✅
+Archive Transaction   ❌
+```
+
+---
+
+# UI Principle
+
+Security لا تعتمد على UI.
+
+حتى لو زر مخفي:
+
+```text
+Firestore Rules
+```
+
+هي الحماية الحقيقية.
+
+UI permission handling هدفه UX فقط.
+
+---
+
+# UI Integration
+
+استخدام:
+
+```text
+BusinessAccess
+can(Permission.x)
+```
+
+أو providers الموجودة.
+
+لا:
+
+```dart
+if (roleId == 'admin')
+```
+
+داخل Widgets.
+
+---
+
+# STEP 9 — ACTIVITY / AUDIT HISTORY UI
+
+## STATUS
+
+**NOT STARTED**
+
+بعد أن Activity Log موجود بالفعل في backend، نحتاج UI لعرضه.
+
+مثال:
+
+```text
+Activity
+
+Ahmed
+Created transaction
+2:41 PM
+
+Mahmoud
+Updated transaction
+3:15 PM
+
+Ahmed
+Created payment
+4:02 PM
+```
+
+---
+
+# Actor Resolution
+
+Activity stores:
+
+```text
+actorUid
+```
+
+UI يحلها إلى:
+
+```text
+actorUid
+→ UserProfile / Business Member identity
+→ display name
+```
+
+لا نغير Activity history لو الاسم تغير.
+
+---
+
+# Potential Filters
+
+لاحقًا:
+
+```text
+By member
+By date
+By entity
+By action
+```
+
+لكن لا نبالغ في complexity في أول implementation.
+
+---
+
+# STEP 10 — SECURITY / BUSINESS ISOLATION VERIFICATION
+
+## STATUS
+
+**NOT STARTED**
+
+قبل اعتبار Multi-Admin feature مكتملة، نحتاج focused verification.
+
+يجب اختبار حالات مثل:
+
+```text
+Business A member
+cannot access
+Business B data
+```
+
+---
+
+## Membership Tests
+
+```text
+active      → permissions apply
+invited     → denied
+suspended   → denied
+removed     → denied
+```
+
+---
+
+## Role Tests
+
+```text
+Viewer write → denied
+
+Accountant permitted create → allowed
+
+Accountant archive without permission → denied
+
+Admin operational access → allowed
+
+Owner → allowed
+```
+
+---
+
+## Audit Security Tests
+
+يجب التأكد أن user لا يستطيع إرسال:
+
+```text
+createdBy = another UID
+```
+
+أو:
+
+```text
+actorUid = another UID
+```
+
+---
+
+## Activity Immutability
+
+اختبار:
+
+```text
+Activity create → authorized
+
+Activity update → denied
+
+Activity delete → denied
+```
+
+---
+
+# ==============================
+
+# AFTER MULTI-ADMIN FEATURE
+
+# ==============================
+
+بعد Step 7–10 يصبح نظام الـMulti-Admin / Company Workspace مكتملًا end-to-end تقريبًا.
+
+السيناريو النهائي:
+
+```text
+Mahmoud
+Owner
+
+        ↓ invites
+
+Ahmed
+Admin
+
+Youssef
+Accountant
+
+Ali
+Viewer
+```
+
+كل واحد:
+
+```text
+Own Firebase Login
+Own UID
+Same Business
+Different Role
+Different Permissions
+```
+
+مثال:
+
+```text
+Ahmed creates Transaction X
+
+Transaction:
+createdBy = Ahmed UID
+
+Activity:
+Ahmed UID
+transaction.created
+X
+```
+
+ثم:
+
+```text
+Mahmoud edits X
+
+Transaction:
+createdBy = Ahmed UID
+updatedBy = Mahmoud UID
+```
+
+Activity:
+
+```text
+Ahmed   transaction.created
+Mahmoud transaction.updated
+```
+
+---
+
+# ==============================
+
+# FUTURE PRODUCTION-SAFETY WORK
+
+# ==============================
+
+الـMulti-Admin feature ليست نهاية خطة architecture بالكامل.
+
+بعد إنهائها نحتاج لاحقًا architecture hardening قبل/بعد production.
+
+---
+
+# STEP 11 — FINANCIAL MUTATION POLICY
+
+نحدد بوضوح:
+
+أي records يمكن:
+
+```text
+update
+archive
+restore
+```
+
+وأي financial operations الأفضل لها:
+
+```text
+correction
+reversal
+```
+
+بدل تعديل التاريخ المالي مباشرة.
+
+خصوصًا:
+
+* transfers
+* payments
+* financial transactions
+
+---
+
+# STEP 12 — SCHEMA VERSIONING
+
+لدينا أصلًا concept:
+
+```text
+schemaVersion
+```
+
+في Business.
+
+لاحقًا نحتاج formalize:
+
+```text
+currentSchemaVersion
+```
+
+وفصل:
+
+```text
+App Version
+```
+
+عن:
+
+```text
+Data Schema Version
+```
+
+---
+
+# STEP 13 — MIGRATION FRAMEWORK
+
+بعد ما التطبيق يبقى production، لا يمكننا تغيير schema بحرية كما نفعل الآن.
+
+نحتاج architecture مثل:
+
+```text
+Migration
+MigrationRunner
+
+v1_to_v2
+v2_to_v3
+...
+```
+
+ويجب أن migrations تكون:
+
+* idempotent
+* resumable/safe
+* non-destructive قدر الإمكان
+
+---
+
+# STEP 14 — BACKWARD-COMPATIBLE MODELS
+
+بعد production:
+
+إضافة field جديدة لا يجب أن تجعل client قديم أو data قديمة تنهار.
+
+نحتاج:
+
+* safe defaults
+* optional new fields
+* tolerant enum parsing
+* unknown permission tolerance
+* version-aware parsing عند الحاجة
+
+بعض الأساس موجود بالفعل، مثل unknown permissions handling.
+
+---
+
+# STEP 15 — DATA LAYER HARDENING
+
+نراجع أن كل Firestore access يمر عبر:
+
+```text
+repositories
+data scopes
+path helpers
+```
+
+ولا يوجد feature يبني Firestore paths عشوائيًا.
+
+الهدف:
+
+سهولة تغيير storage/schema مستقبلًا.
+
+---
+
+# STEP 16 — VALIDATION / REFERENTIAL INTEGRITY
+
+تقوية validation مثل:
+
+* valid amounts
+* valid owner IDs
+* valid debt IDs
+* valid references
+* valid Business scope
+* valid enums
+* cross-document invariants المهمة
+
+---
+
+# STEP 17 — ARCHIVING STANDARD REVIEW
+
+الأساس موجود بالفعل.
+
+لكن نراجع أن كل persisted financial entities تتبع نفس lifecycle policy.
+
+الهدف:
+
+لا يوجد feature يعمل hard delete بينما الباقي archive بدون سبب.
+
+---
+
+# STEP 18 — ARCHITECTURE DOCUMENTATION
+
+في النهاية نكتب/نحدث:
+
+```text
+ARCHITECTURE.md
+```
+
+ليصبح contract لأي Developer أو Codex مستقبلًا.
 
 يشمل:
 
-* Validation.
-* Success Message.
-* Error Handling.
-* Rate Limiting Messages.
+* Business scoping
+* Membership
+* Roles
+* Permissions
+* Actor identity
+* AuditMetadata
+* Activity Log
+* Firestore security
+* Repository boundaries
+* Schema versioning
+* Migration rules
+* backward compatibility rules
+* soft-delete policy
 
 ---
 
-# 👤 المرحلة 5 — إعدادات الحساب
+# ==============================
 
-## Profile
+# OVERALL ROADMAP
 
-* تعديل Display Name.
-* تغيير صورة الحساب.
-* تغيير Username (مع الحفاظ على الـUnique).
-* تحديث Email (بعد إعادة التحقق إذا لزم).
-* تغيير Password.
-* Delete Account.
+# ==============================
 
----
+الحالة الحالية:
 
-# 🔒 المرحلة 6 — الأمان
+```text
+01 Membership Foundation             ✅ DONE
 
-* Re-authentication للعمليات الحساسة.
-* تسجيل آخر وقت دخول.
-* Last Login.
-* Created At.
-* Linked Providers.
-* Logout from All Devices (لو هتضيف Sessions مستقبلًا).
+02 Roles & Permissions               ✅ DONE
 
----
+03 Independent Member Identity       ✅ DONE
 
-# ⭐ المرحلة 7 — Username Login (عندما يتوفر Backend أو Blaze)
+04 Unified Audit Metadata            ✅ DONE
 
-تفعيل الكود الجاهز:
+05 Immutable Activity Log            ✅ DONE
 
-```
-Email or Username
+06 Financial Permission Enforcement  ✅ DONE
 
-↓
+--------------------------------------------
 
-Username
+07 Member Management + Invitations   ⏳ NEXT
 
-↓
+08 Permission-aware UI               ⏳ NEXT
 
-Backend / Cloud Function
+09 Activity / Audit UI               ⏳ TODO
 
-↓
+10 Security / Isolation Verification ⏳ TODO
 
-Resolve Email
+--------------------------------------------
 
-↓
+11 Financial Mutation Policy         ⏳ FUTURE
 
-Firebase Login
+12 Schema Versioning                 ⏳ FUTURE
 
-↓
+13 Migration Framework               ⏳ FUTURE
 
-Home
-```
+14 Backward-Compatible Models        ⏳ FUTURE
 
----
+15 Data Layer Hardening              ⏳ FUTURE
 
-# 🎨 المرحلة 8 — تحسين الـUX
+16 Validation / Integrity            ⏳ FUTURE
 
-* Splash Animation.
-* Login Animation.
-* Success Animation.
-* Skeleton Loading.
-* Better Error Messages.
-* Password Strength Indicator.
-* Show/Hide Password.
-* Remember Me.
+17 Archiving Standard Review         ⏳ FUTURE
 
----
-
-# 📱 المرحلة 9 — Google Account Enhancements
-
-* عرض صورة Google.
-* Display Name من Google.
-* مزامنة صورة الحساب.
-* Add Password Login من Settings (اختياري).
-* Unlink Google.
-* Link Google لحساب Email موجود.
-
----
-
-# 🚀 المرحلة 10 — النسخة الاحترافية
-
-* App Check.
-* MFA (Two-Factor Authentication).
-* Device Management.
-* Login History.
-* Security Notifications.
-* Admin Dashboard.
-* Analytics.
-* Crash Reporting.
-
----
-
-## 📍 الترتيب اللي أنصح نمشي بيه
-
-```
-✅ Firebase Setup
-✅ Email Login
-✅ Username Registration
-⬜ Google Sign-In
-⬜ Account Linking
-⬜ Email Verification
-⬜ Forgot Password
-⬜ Profile Settings
-⬜ Security
-⬜ Username Login (بعد Backend/Blaze)
-⬜ UX Improvements
-⬜ Production Hardening
+18 Architecture Documentation        ⏳ FINAL
 ```
 
-بالترتيب ده هتكون بتبني النظام من الأساسيات إلى المزايا المتقدمة، وكل مرحلة تعتمد على اللي قبلها بدون تعقيد أو إعادة شغل.
+---
+
+# IMMEDIATE PLAN
+
+عند استكمال العمل:
+
+**لا تعيد Steps 1–6.**
+
+ابدأ بـ:
+
+```text
+STEP 7 + STEP 8
+```
+
+في Prompt واحد إذا كان scope مازال manageable:
+
+### STEP 7
+
+Member Management + Invitations
+
+### STEP 8
+
+Permission-aware UI
+
+بعد نجاحهما:
+
+```text
+STEP 9 + STEP 10
+```
+
+### STEP 9
+
+Activity/Audit History UI
+
+### STEP 10
+
+Security + Business Isolation Verification
+
+بعدها نعتبر:
+
+**Multi-Admin / Company Workspace feature COMPLETE.**
+
+ثم نرجع لخطة production-safe architecture في Steps 11–18.
+
+---
+
+# CURRENT TECHNICAL WARNING
+
+قبل اختبار الـsystem roles فعليًا:
+
+راجع/reseed development Business role documents لأن permission catalog تغير أثناء Step 6.
+
+خصوصًا تمت إضافة:
+
+```text
+owners.read
+owners.create
+owners.update
+owners.archive
+
+transfers.archive
+```
+
+لا يوجد migration مطلوب لأن المشروع مازال pre-production.
+
+---
+
+# INSTRUCTION FOR A NEW CHAT
+
+إذا تم إرسال هذا المستند إلى ChatGPT/Codex في محادثة جديدة:
+
+1. اقرأ المستند بالكامل.
+2. اعتبر Steps 1–6 مكتملة.
+3. لا تقترح إعادة تصميم ما تم تنفيذه بدون سبب حقيقي.
+4. لا تبدأ migration work الآن.
+5. حافظ على architecture الحالية.
+6. وفر Codex credits في exploration/commands وليس في code quality.
+7. الخطوة التالية هي STEP 7 + STEP 8.
+8. اطلب نتيجة Codex بعد كل implementation قبل كتابة الخطوة التالية.

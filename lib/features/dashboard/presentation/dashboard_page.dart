@@ -20,8 +20,8 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../company_assets/application/company_asset_providers.dart';
-import '../../auth/application/account_switch_controller.dart';
-import '../../auth/application/auth_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
 
@@ -32,18 +32,46 @@ class DashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ownersAsync = ref.watch(ownersStreamProvider);
-    final cashAsync = ref.watch(totalCompanyBalanceProvider);
-    final debtsAsync = ref.watch(debtSummaryProvider);
-    final receivablesAsync = ref.watch(owedToUsDebtSummaryProvider);
-    final assetsAsync = ref.watch(totalAssetsValueProvider);
-    final transactionsAsync = ref.watch(financialTransactionsProvider);
-    final ownerBalancesAsync = ref.watch(ownerBalancesProvider);
-    ref.listen(ownersStreamProvider, (previous, next) {
-      if (next.hasError && previous?.error != next.error) {
-        _logDashboardFailure(ref, next.error!, next.stackTrace!);
-      }
-    });
+    final readable = <Permission>{
+      for (final permission in [
+        Permission.ownersRead,
+        Permission.transactionsRead,
+        Permission.transfersRead,
+        Permission.debtsRead,
+        Permission.receivablesRead,
+        Permission.assetsRead,
+      ])
+        if (ref.watch(canProvider(permission)).value == true) permission,
+    };
+    final canReadOwners = readable.contains(Permission.ownersRead);
+    final canReadCash = canReadOwners &&
+        readable.contains(Permission.transactionsRead) &&
+        readable.contains(Permission.transfersRead);
+    final ownersAsync = canReadOwners
+        ? ref.watch(ownersStreamProvider)
+        : const AsyncData<List<Owner>>([]);
+    final cashAsync = canReadCash
+        ? ref.watch(totalCompanyBalanceProvider)
+        : const AsyncData<double>(0);
+    final debtsAsync = readable.contains(Permission.debtsRead)
+        ? ref.watch(debtSummaryProvider)
+        : const AsyncData(
+            DebtSummary(totalDebts: 0, totalPaid: 0, remaining: 0),
+          );
+    final receivablesAsync = readable.contains(Permission.receivablesRead)
+        ? ref.watch(owedToUsDebtSummaryProvider)
+        : const AsyncData(
+            DebtSummary(totalDebts: 0, totalPaid: 0, remaining: 0),
+          );
+    final assetsAsync = readable.contains(Permission.assetsRead)
+        ? ref.watch(totalAssetsValueProvider)
+        : const AsyncData<double>(0);
+    final transactionsAsync = readable.contains(Permission.transactionsRead)
+        ? ref.watch(financialTransactionsProvider)
+        : const AsyncData<List<money.Transaction>>([]);
+    final ownerBalancesAsync = canReadCash
+        ? ref.watch(ownerBalancesProvider)
+        : const AsyncData<Map<String, double>>({});
 
     return AppShell(
       title: 'Dashboard',
@@ -58,6 +86,7 @@ class DashboardPage extends ConsumerWidget {
           assetsAsync: assetsAsync,
           transactionsAsync: transactionsAsync,
           ownerBalancesAsync: ownerBalancesAsync,
+          readable: readable,
         ),
         loading: () => const LoadingSkeleton(itemCount: 5),
         error: (error, stackTrace) => ErrorState(
@@ -73,31 +102,11 @@ class DashboardPage extends ConsumerWidget {
     ref.invalidate(ownersStreamProvider);
     ref.invalidate(financialTransactionsProvider);
     ref.invalidate(financialTransfersProvider);
-    ref.invalidate(debtsStreamProvider);
+    ref.invalidate(weOweDebtsStreamProvider);
+    ref.invalidate(owedToUsDebtsStreamProvider);
     ref.invalidate(assetsStreamProvider);
   }
 
-  void _logDashboardFailure(
-    WidgetRef ref,
-    Object error,
-    StackTrace stackTrace,
-  ) {
-    if (!kDebugMode) return;
-    final uid = ref.read(currentUidProvider);
-    final switchState = ref.read(accountSwitchControllerProvider);
-    debugPrint(
-      'Dashboard provider failed: provider=ownersStreamProvider, '
-      'repository=FirestoreOwnerRepository(uid=$uid), '
-      'path=users/$uid/owners, exceptionType=${error.runtimeType}, '
-      'message=$error, FirebaseAuth.currentUserIsNull=${uid == null}, '
-      'accountSwitchLoading=${switchState is AccountSwitchLoading}, '
-      'repositoryUidIsImmutable=true.',
-    );
-    debugPrintStack(
-      label: 'ownersStreamProvider stack trace',
-      stackTrace: stackTrace,
-    );
-  }
 }
 
 class _DashboardHome extends StatelessWidget {
@@ -109,6 +118,7 @@ class _DashboardHome extends StatelessWidget {
     required this.assetsAsync,
     required this.transactionsAsync,
     required this.ownerBalancesAsync,
+    required this.readable,
   });
 
   final List<Owner> owners;
@@ -118,6 +128,7 @@ class _DashboardHome extends StatelessWidget {
   final AsyncValue<double> assetsAsync;
   final AsyncValue<List<money.Transaction>> transactionsAsync;
   final AsyncValue<Map<String, double>> ownerBalancesAsync;
+  final Set<Permission> readable;
 
   @override
   Widget build(BuildContext context) {
@@ -129,32 +140,46 @@ class _DashboardHome extends StatelessWidget {
         children: [
           const _DashboardHeader(),
           const SizedBox(height: AppSpacing.lg),
-          _MainFinancialCards(
-            owners: owners,
-            cashAsync: cashAsync,
-            debtsAsync: debtsAsync,
-            receivablesAsync: receivablesAsync,
-            assetsAsync: assetsAsync,
-            ownerBalancesAsync: ownerBalancesAsync,
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          if (readable.length == 6) ...[
+            _MainFinancialCards(
+              owners: owners,
+              cashAsync: cashAsync,
+              debtsAsync: debtsAsync,
+              receivablesAsync: receivablesAsync,
+              assetsAsync: assetsAsync,
+              ownerBalancesAsync: ownerBalancesAsync,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           _FinancialSnapshotGrid(
             owners: owners,
             debtsAsync: debtsAsync,
             receivablesAsync: receivablesAsync,
             assetsAsync: assetsAsync,
+            readable: readable,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          _RecentActivitySection(
-            owners: owners,
-            transactionsAsync: transactionsAsync,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _FinancialHealthCard(
-            cashAsync: cashAsync,
-            debtsAsync: debtsAsync,
-            receivablesAsync: receivablesAsync,
-          ),
+          if (readable.contains(Permission.transactionsRead) &&
+              readable.contains(Permission.ownersRead)) ...[
+            const SizedBox(height: AppSpacing.lg),
+            _RecentActivitySection(
+              owners: owners,
+              transactionsAsync: transactionsAsync,
+            ),
+          ],
+          if (readable.containsAll({
+            Permission.ownersRead,
+            Permission.transactionsRead,
+            Permission.transfersRead,
+            Permission.debtsRead,
+            Permission.receivablesRead,
+          })) ...[
+            const SizedBox(height: AppSpacing.lg),
+            _FinancialHealthCard(
+              cashAsync: cashAsync,
+              debtsAsync: debtsAsync,
+              receivablesAsync: receivablesAsync,
+            ),
+          ],
         ],
       ),
     );
@@ -757,24 +782,28 @@ class _FinancialSnapshotGrid extends StatelessWidget {
     required this.debtsAsync,
     required this.receivablesAsync,
     required this.assetsAsync,
+    required this.readable,
   });
 
   final List<Owner> owners;
   final AsyncValue<DebtSummary> debtsAsync;
   final AsyncValue<DebtSummary> receivablesAsync;
   final AsyncValue<double> assetsAsync;
+  final Set<Permission> readable;
 
   @override
   Widget build(BuildContext context) {
     final shortcuts = [
-      _MetricData(
+      if (readable.contains(Permission.debtsRead))
+        _MetricData(
         title: 'Debts',
         value: _moneyValue(debtsAsync.whenData((value) => value.remaining)),
         icon: Icons.warning_amber_rounded,
         color: AppColors.danger,
         route: AppRoute.debts,
       ),
-      _MetricData(
+      if (readable.contains(Permission.receivablesRead))
+        _MetricData(
         title: 'Receivables',
         value: _moneyValue(
           receivablesAsync.whenData((value) => value.remaining),
@@ -783,14 +812,16 @@ class _FinancialSnapshotGrid extends StatelessWidget {
         color: AppColors.info,
         route: AppRoute.receivables,
       ),
-      _MetricData(
+      if (readable.contains(Permission.assetsRead))
+        _MetricData(
         title: 'Assets',
         value: _moneyValue(assetsAsync),
         icon: Icons.business_center_rounded,
         color: AppColors.warning,
         route: AppRoute.companyAssets,
       ),
-      _MetricData(
+      if (readable.contains(Permission.ownersRead))
+        _MetricData(
         title: 'Money Holders',
         value: owners.length.toString(),
         icon: Icons.group_rounded,
@@ -803,7 +834,11 @@ class _FinancialSnapshotGrid extends StatelessWidget {
       title: 'Financial Snapshot',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 920 ? 4 : 2;
+          final columns = shortcuts.length == 1
+              ? 1
+              : constraints.maxWidth >= 920
+              ? 4
+              : 2;
 
           return GridView.builder(
             itemCount: shortcuts.length,

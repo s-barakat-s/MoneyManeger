@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Debt {
 
- String get id; String get personName; DebtType get type; double get totalAmount; double get paidAmount; DebtStatus get status; DateTime get createdAt; DateTime? get updatedAt; DateTime? get dueDate; DateTime? get archivedAt; String? get note;
+ String get id; String get personName; DebtType get type; double get totalAmount; double get paidAmount; DebtStatus get status; DateTime? get dueDate; String? get note; AuditMetadata get audit;
 /// Create a copy of Debt
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $DebtCopyWith<Debt> get copyWith => _$DebtCopyWithImpl<Debt>(this as Debt, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Debt&&(identical(other.id, id) || other.id == id)&&(identical(other.personName, personName) || other.personName == personName)&&(identical(other.type, type) || other.type == type)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.paidAmount, paidAmount) || other.paidAmount == paidAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.dueDate, dueDate) || other.dueDate == dueDate)&&(identical(other.archivedAt, archivedAt) || other.archivedAt == archivedAt)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Debt&&(identical(other.id, id) || other.id == id)&&(identical(other.personName, personName) || other.personName == personName)&&(identical(other.type, type) || other.type == type)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.paidAmount, paidAmount) || other.paidAmount == paidAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.dueDate, dueDate) || other.dueDate == dueDate)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,personName,type,totalAmount,paidAmount,status,createdAt,updatedAt,dueDate,archivedAt,note);
+int get hashCode => Object.hash(runtimeType,id,personName,type,totalAmount,paidAmount,status,dueDate,note,audit);
 
 @override
 String toString() {
-  return 'Debt(id: $id, personName: $personName, type: $type, totalAmount: $totalAmount, paidAmount: $paidAmount, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, dueDate: $dueDate, archivedAt: $archivedAt, note: $note)';
+  return 'Debt(id: $id, personName: $personName, type: $type, totalAmount: $totalAmount, paidAmount: $paidAmount, status: $status, dueDate: $dueDate, note: $note, audit: $audit)';
 }
 
 
@@ -48,11 +48,11 @@ abstract mixin class $DebtCopyWith<$Res>  {
   factory $DebtCopyWith(Debt value, $Res Function(Debt) _then) = _$DebtCopyWithImpl;
 @useResult
 $Res call({
- String id, String personName, DebtType type, double totalAmount, double paidAmount, DebtStatus status, DateTime createdAt, DateTime? updatedAt, DateTime? dueDate, DateTime? archivedAt, String? note
+ String id, String personName, DebtType type, double totalAmount, double paidAmount, DebtStatus status, DateTime? dueDate, String? note, AuditMetadata audit
 });
 
 
-
+$AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -65,7 +65,7 @@ class _$DebtCopyWithImpl<$Res>
 
 /// Create a copy of Debt
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? personName = null,Object? type = null,Object? totalAmount = null,Object? paidAmount = null,Object? status = null,Object? createdAt = null,Object? updatedAt = freezed,Object? dueDate = freezed,Object? archivedAt = freezed,Object? note = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? personName = null,Object? type = null,Object? totalAmount = null,Object? paidAmount = null,Object? status = null,Object? dueDate = freezed,Object? note = freezed,Object? audit = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,personName: null == personName ? _self.personName : personName // ignore: cast_nullable_to_non_nullable
@@ -73,15 +73,22 @@ as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non
 as DebtType,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as double,paidAmount: null == paidAmount ? _self.paidAmount : paidAmount // ignore: cast_nullable_to_non_nullable
 as double,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as DebtStatus,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,updatedAt: freezed == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,dueDate: freezed == dueDate ? _self.dueDate : dueDate // ignore: cast_nullable_to_non_nullable
-as DateTime?,archivedAt: freezed == archivedAt ? _self.archivedAt : archivedAt // ignore: cast_nullable_to_non_nullable
+as DebtStatus,dueDate: freezed == dueDate ? _self.dueDate : dueDate // ignore: cast_nullable_to_non_nullable
 as DateTime?,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
+/// Create a copy of Debt
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 
@@ -163,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime createdAt,  DateTime? updatedAt,  DateTime? dueDate,  DateTime? archivedAt,  String? note)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime? dueDate,  String? note,  AuditMetadata audit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Debt() when $default != null:
-return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.createdAt,_that.updatedAt,_that.dueDate,_that.archivedAt,_that.note);case _:
+return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.dueDate,_that.note,_that.audit);case _:
   return orElse();
 
 }
@@ -184,10 +191,10 @@ return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.pai
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime createdAt,  DateTime? updatedAt,  DateTime? dueDate,  DateTime? archivedAt,  String? note)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime? dueDate,  String? note,  AuditMetadata audit)  $default,) {final _that = this;
 switch (_that) {
 case _Debt():
-return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.createdAt,_that.updatedAt,_that.dueDate,_that.archivedAt,_that.note);case _:
+return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.dueDate,_that.note,_that.audit);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -204,10 +211,10 @@ return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.pai
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime createdAt,  DateTime? updatedAt,  DateTime? dueDate,  DateTime? archivedAt,  String? note)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String personName,  DebtType type,  double totalAmount,  double paidAmount,  DebtStatus status,  DateTime? dueDate,  String? note,  AuditMetadata audit)?  $default,) {final _that = this;
 switch (_that) {
 case _Debt() when $default != null:
-return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.createdAt,_that.updatedAt,_that.dueDate,_that.archivedAt,_that.note);case _:
+return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.paidAmount,_that.status,_that.dueDate,_that.note,_that.audit);case _:
   return null;
 
 }
@@ -219,7 +226,7 @@ return $default(_that.id,_that.personName,_that.type,_that.totalAmount,_that.pai
 @JsonSerializable()
 
 class _Debt implements Debt {
-  const _Debt({required this.id, required this.personName, required this.type, required this.totalAmount, this.paidAmount = 0, this.status = DebtStatus.active, required this.createdAt, this.updatedAt, this.dueDate, this.archivedAt, this.note});
+  const _Debt({required this.id, required this.personName, required this.type, required this.totalAmount, this.paidAmount = 0, this.status = DebtStatus.active, this.dueDate, this.note, this.audit = const AuditMetadata()});
   factory _Debt.fromJson(Map<String, dynamic> json) => _$DebtFromJson(json);
 
 @override final  String id;
@@ -228,11 +235,9 @@ class _Debt implements Debt {
 @override final  double totalAmount;
 @override@JsonKey() final  double paidAmount;
 @override@JsonKey() final  DebtStatus status;
-@override final  DateTime createdAt;
-@override final  DateTime? updatedAt;
 @override final  DateTime? dueDate;
-@override final  DateTime? archivedAt;
 @override final  String? note;
+@override@JsonKey() final  AuditMetadata audit;
 
 /// Create a copy of Debt
 /// with the given fields replaced by the non-null parameter values.
@@ -247,16 +252,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Debt&&(identical(other.id, id) || other.id == id)&&(identical(other.personName, personName) || other.personName == personName)&&(identical(other.type, type) || other.type == type)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.paidAmount, paidAmount) || other.paidAmount == paidAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.dueDate, dueDate) || other.dueDate == dueDate)&&(identical(other.archivedAt, archivedAt) || other.archivedAt == archivedAt)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Debt&&(identical(other.id, id) || other.id == id)&&(identical(other.personName, personName) || other.personName == personName)&&(identical(other.type, type) || other.type == type)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.paidAmount, paidAmount) || other.paidAmount == paidAmount)&&(identical(other.status, status) || other.status == status)&&(identical(other.dueDate, dueDate) || other.dueDate == dueDate)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,personName,type,totalAmount,paidAmount,status,createdAt,updatedAt,dueDate,archivedAt,note);
+int get hashCode => Object.hash(runtimeType,id,personName,type,totalAmount,paidAmount,status,dueDate,note,audit);
 
 @override
 String toString() {
-  return 'Debt(id: $id, personName: $personName, type: $type, totalAmount: $totalAmount, paidAmount: $paidAmount, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, dueDate: $dueDate, archivedAt: $archivedAt, note: $note)';
+  return 'Debt(id: $id, personName: $personName, type: $type, totalAmount: $totalAmount, paidAmount: $paidAmount, status: $status, dueDate: $dueDate, note: $note, audit: $audit)';
 }
 
 
@@ -267,11 +272,11 @@ abstract mixin class _$DebtCopyWith<$Res> implements $DebtCopyWith<$Res> {
   factory _$DebtCopyWith(_Debt value, $Res Function(_Debt) _then) = __$DebtCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String personName, DebtType type, double totalAmount, double paidAmount, DebtStatus status, DateTime createdAt, DateTime? updatedAt, DateTime? dueDate, DateTime? archivedAt, String? note
+ String id, String personName, DebtType type, double totalAmount, double paidAmount, DebtStatus status, DateTime? dueDate, String? note, AuditMetadata audit
 });
 
 
-
+@override $AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -284,7 +289,7 @@ class __$DebtCopyWithImpl<$Res>
 
 /// Create a copy of Debt
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? personName = null,Object? type = null,Object? totalAmount = null,Object? paidAmount = null,Object? status = null,Object? createdAt = null,Object? updatedAt = freezed,Object? dueDate = freezed,Object? archivedAt = freezed,Object? note = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? personName = null,Object? type = null,Object? totalAmount = null,Object? paidAmount = null,Object? status = null,Object? dueDate = freezed,Object? note = freezed,Object? audit = null,}) {
   return _then(_Debt(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,personName: null == personName ? _self.personName : personName // ignore: cast_nullable_to_non_nullable
@@ -292,16 +297,23 @@ as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non
 as DebtType,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as double,paidAmount: null == paidAmount ? _self.paidAmount : paidAmount // ignore: cast_nullable_to_non_nullable
 as double,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as DebtStatus,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
-as DateTime,updatedAt: freezed == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
-as DateTime?,dueDate: freezed == dueDate ? _self.dueDate : dueDate // ignore: cast_nullable_to_non_nullable
-as DateTime?,archivedAt: freezed == archivedAt ? _self.archivedAt : archivedAt // ignore: cast_nullable_to_non_nullable
+as DebtStatus,dueDate: freezed == dueDate ? _self.dueDate : dueDate // ignore: cast_nullable_to_non_nullable
 as DateTime?,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
 
+/// Create a copy of Debt
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 // dart format on

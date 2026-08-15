@@ -13,6 +13,9 @@ _Transaction _$TransactionFromJson(Map<String, dynamic> json) => _Transaction(
   amount: (json['amount'] as num).toDouble(),
   date: DateTime.parse(json['date'] as String),
   note: json['note'] as String?,
+  audit: json['audit'] == null
+      ? const AuditMetadata()
+      : AuditMetadata.fromJson(json['audit'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$TransactionToJson(_Transaction instance) =>
@@ -23,6 +26,7 @@ Map<String, dynamic> _$TransactionToJson(_Transaction instance) =>
       'amount': instance.amount,
       'date': instance.date.toIso8601String(),
       'note': instance.note,
+      'audit': instance.audit,
     };
 
 const _$TransactionTypeEnumMap = {

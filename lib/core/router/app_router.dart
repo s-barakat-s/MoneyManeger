@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/company_assets/presentation/company_assets_page.dart';
+import '../../features/activity_log/presentation/activity_page.dart';
+import '../../features/business/domain/permission.dart';
 import '../../features/dashboard/presentation/dashboard_page.dart';
 import '../../features/debts/presentation/debts_page.dart';
 import '../../features/owners/presentation/owners_page.dart';
 import '../../features/receivables/presentation/receivables_page.dart';
 import '../../features/reports/presentation/reports_page.dart';
 import '../../features/settings/presentation/settings_page.dart';
+import '../../features/members/presentation/invitations_page.dart';
+import '../../features/members/presentation/members_page.dart';
 import '../../features/transactions/presentation/transactions_page.dart';
 import '../../features/transfers/presentation/transfers_page.dart';
+import '../../shared/widgets/permission_page_guard.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final primaryTabTransitions = _PrimaryTabTransitions();
@@ -32,10 +37,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoute.owners.name,
         pageBuilder: (context, state) => _homeCardPage(
           state: state,
-          child: OwnersPage(
+          child: PermissionPageGuard(
+            permission: Permission.ownersRead,
+            title: 'Owners / Money Holders',
             currentLocation: state.uri.path,
-            quickAdd: state.uri.queryParameters['quickAdd'],
-            quickAddTrigger: state.uri.queryParameters['trigger'],
+            child: OwnersPage(
+              currentLocation: state.uri.path,
+              quickAdd: state.uri.queryParameters['quickAdd'],
+              quickAddTrigger: state.uri.queryParameters['trigger'],
+            ),
           ),
         ),
       ),
@@ -45,10 +55,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => primaryTabTransitions.buildPage(
           state: state,
           index: 1,
-          child: TransactionsPage(
+          child: PermissionPageGuard(
+            permission: Permission.transactionsRead,
+            title: 'Transactions',
             currentLocation: state.uri.path,
-            quickAdd: state.uri.queryParameters['quickAdd'],
-            quickAddTrigger: state.uri.queryParameters['trigger'],
+            child: TransactionsPage(
+              currentLocation: state.uri.path,
+              quickAdd: state.uri.queryParameters['quickAdd'],
+              quickAddTrigger: state.uri.queryParameters['trigger'],
+            ),
           ),
         ),
       ),
@@ -58,10 +73,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => primaryTabTransitions.buildPage(
           state: state,
           index: 2,
-          child: TransfersPage(
+          child: PermissionPageGuard(
+            permission: Permission.transfersRead,
+            title: 'Transfers',
             currentLocation: state.uri.path,
-            quickAdd: state.uri.queryParameters['quickAdd'],
-            quickAddTrigger: state.uri.queryParameters['trigger'],
+            child: TransfersPage(
+              currentLocation: state.uri.path,
+              quickAdd: state.uri.queryParameters['quickAdd'],
+              quickAddTrigger: state.uri.queryParameters['trigger'],
+            ),
           ),
         ),
       ),
@@ -70,10 +90,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoute.debts.name,
         pageBuilder: (context, state) => _homeCardPage(
           state: state,
-          child: DebtsPage(
+          child: PermissionPageGuard(
+            permission: Permission.debtsRead,
+            title: 'Debts',
             currentLocation: state.uri.path,
-            quickAdd: state.uri.queryParameters['quickAdd'],
-            quickAddTrigger: state.uri.queryParameters['trigger'],
+            child: DebtsPage(
+              currentLocation: state.uri.path,
+              quickAdd: state.uri.queryParameters['quickAdd'],
+              quickAddTrigger: state.uri.queryParameters['trigger'],
+            ),
           ),
         ),
       ),
@@ -82,10 +107,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoute.receivables.name,
         pageBuilder: (context, state) => _homeCardPage(
           state: state,
-          child: ReceivablesPage(
+          child: PermissionPageGuard(
+            permission: Permission.receivablesRead,
+            title: 'Receivables',
             currentLocation: state.uri.path,
-            quickAdd: state.uri.queryParameters['quickAdd'],
-            quickAddTrigger: state.uri.queryParameters['trigger'],
+            child: ReceivablesPage(
+              currentLocation: state.uri.path,
+              quickAdd: state.uri.queryParameters['quickAdd'],
+              quickAddTrigger: state.uri.queryParameters['trigger'],
+            ),
           ),
         ),
       ),
@@ -94,7 +124,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoute.companyAssets.name,
         pageBuilder: (context, state) => _homeCardPage(
           state: state,
-          child: CompanyAssetsPage(currentLocation: state.uri.path),
+          child: PermissionPageGuard(
+            permission: Permission.assetsRead,
+            title: 'Company Assets',
+            currentLocation: state.uri.path,
+            child: CompanyAssetsPage(currentLocation: state.uri.path),
+          ),
         ),
       ),
       GoRoute(
@@ -103,8 +138,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => primaryTabTransitions.buildPage(
           state: state,
           index: 3,
-          child: ReportsPage(currentLocation: state.uri.path),
+          child: PermissionPageGuard(
+            permission: Permission.reportsRead,
+            title: 'Reports',
+            currentLocation: state.uri.path,
+            child: ReportsPage(currentLocation: state.uri.path),
+          ),
         ),
+      ),
+      GoRoute(
+        path: AppRoute.members.path,
+        name: AppRoute.members.name,
+        builder: (context, state) => PermissionPageGuard(
+          permission: Permission.membersRead,
+          title: 'Business Members',
+          currentLocation: state.uri.path,
+          child: MembersPage(currentLocation: state.uri.path),
+        ),
+      ),
+      GoRoute(
+        path: AppRoute.activity.path,
+        name: AppRoute.activity.name,
+        builder: (context, state) => PermissionPageGuard(
+          permission: Permission.activityRead,
+          title: 'Activity',
+          currentLocation: state.uri.path,
+          child: ActivityPage(currentLocation: state.uri.path),
+        ),
+      ),
+      GoRoute(
+        path: AppRoute.invitations.path,
+        name: AppRoute.invitations.name,
+        builder: (context, state) =>
+            InvitationsPage(currentLocation: state.uri.path),
       ),
       GoRoute(
         path: AppRoute.settings.path,
@@ -178,6 +244,9 @@ enum AppRoute {
   receivables('/receivables'),
   companyAssets('/company-assets'),
   reports('/reports'),
+  members('/members'),
+  activity('/activity'),
+  invitations('/invitations'),
   settings('/settings');
 
   const AppRoute(this.path);

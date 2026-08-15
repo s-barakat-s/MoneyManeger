@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$CompanyAsset {
 
- String get id; String get name; AssetCategory get category; double get purchasePrice; DateTime get purchaseDate; DateTime get createdAt; String? get note;
+ String get id; String get name; AssetCategory get category; double get purchasePrice; DateTime get purchaseDate; String? get note; AuditMetadata get audit;
 /// Create a copy of CompanyAsset
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $CompanyAssetCopyWith<CompanyAsset> get copyWith => _$CompanyAssetCopyWithImpl<C
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanyAsset&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.category, category) || other.category == category)&&(identical(other.purchasePrice, purchasePrice) || other.purchasePrice == purchasePrice)&&(identical(other.purchaseDate, purchaseDate) || other.purchaseDate == purchaseDate)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CompanyAsset&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.category, category) || other.category == category)&&(identical(other.purchasePrice, purchasePrice) || other.purchasePrice == purchasePrice)&&(identical(other.purchaseDate, purchaseDate) || other.purchaseDate == purchaseDate)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,category,purchasePrice,purchaseDate,createdAt,note);
+int get hashCode => Object.hash(runtimeType,id,name,category,purchasePrice,purchaseDate,note,audit);
 
 @override
 String toString() {
-  return 'CompanyAsset(id: $id, name: $name, category: $category, purchasePrice: $purchasePrice, purchaseDate: $purchaseDate, createdAt: $createdAt, note: $note)';
+  return 'CompanyAsset(id: $id, name: $name, category: $category, purchasePrice: $purchasePrice, purchaseDate: $purchaseDate, note: $note, audit: $audit)';
 }
 
 
@@ -48,11 +48,11 @@ abstract mixin class $CompanyAssetCopyWith<$Res>  {
   factory $CompanyAssetCopyWith(CompanyAsset value, $Res Function(CompanyAsset) _then) = _$CompanyAssetCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, AssetCategory category, double purchasePrice, DateTime purchaseDate, DateTime createdAt, String? note
+ String id, String name, AssetCategory category, double purchasePrice, DateTime purchaseDate, String? note, AuditMetadata audit
 });
 
 
-
+$AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -65,19 +65,28 @@ class _$CompanyAssetCopyWithImpl<$Res>
 
 /// Create a copy of CompanyAsset
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? category = null,Object? purchasePrice = null,Object? purchaseDate = null,Object? createdAt = null,Object? note = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? category = null,Object? purchasePrice = null,Object? purchaseDate = null,Object? note = freezed,Object? audit = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,category: null == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
 as AssetCategory,purchasePrice: null == purchasePrice ? _self.purchasePrice : purchasePrice // ignore: cast_nullable_to_non_nullable
 as double,purchaseDate: null == purchaseDate ? _self.purchaseDate : purchaseDate // ignore: cast_nullable_to_non_nullable
-as DateTime,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
+/// Create a copy of CompanyAsset
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 
@@ -159,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  DateTime createdAt,  String? note)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  String? note,  AuditMetadata audit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _CompanyAsset() when $default != null:
-return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.createdAt,_that.note);case _:
+return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.note,_that.audit);case _:
   return orElse();
 
 }
@@ -180,10 +189,10 @@ return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.pur
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  DateTime createdAt,  String? note)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  String? note,  AuditMetadata audit)  $default,) {final _that = this;
 switch (_that) {
 case _CompanyAsset():
-return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.createdAt,_that.note);case _:
+return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.note,_that.audit);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -200,10 +209,10 @@ return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.pur
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  DateTime createdAt,  String? note)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  AssetCategory category,  double purchasePrice,  DateTime purchaseDate,  String? note,  AuditMetadata audit)?  $default,) {final _that = this;
 switch (_that) {
 case _CompanyAsset() when $default != null:
-return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.createdAt,_that.note);case _:
+return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.purchaseDate,_that.note,_that.audit);case _:
   return null;
 
 }
@@ -215,7 +224,7 @@ return $default(_that.id,_that.name,_that.category,_that.purchasePrice,_that.pur
 @JsonSerializable()
 
 class _CompanyAsset implements CompanyAsset {
-  const _CompanyAsset({required this.id, required this.name, required this.category, required this.purchasePrice, required this.purchaseDate, required this.createdAt, this.note});
+  const _CompanyAsset({required this.id, required this.name, required this.category, required this.purchasePrice, required this.purchaseDate, this.note, this.audit = const AuditMetadata()});
   factory _CompanyAsset.fromJson(Map<String, dynamic> json) => _$CompanyAssetFromJson(json);
 
 @override final  String id;
@@ -223,8 +232,8 @@ class _CompanyAsset implements CompanyAsset {
 @override final  AssetCategory category;
 @override final  double purchasePrice;
 @override final  DateTime purchaseDate;
-@override final  DateTime createdAt;
 @override final  String? note;
+@override@JsonKey() final  AuditMetadata audit;
 
 /// Create a copy of CompanyAsset
 /// with the given fields replaced by the non-null parameter values.
@@ -239,16 +248,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanyAsset&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.category, category) || other.category == category)&&(identical(other.purchasePrice, purchasePrice) || other.purchasePrice == purchasePrice)&&(identical(other.purchaseDate, purchaseDate) || other.purchaseDate == purchaseDate)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.note, note) || other.note == note));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CompanyAsset&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.category, category) || other.category == category)&&(identical(other.purchasePrice, purchasePrice) || other.purchasePrice == purchasePrice)&&(identical(other.purchaseDate, purchaseDate) || other.purchaseDate == purchaseDate)&&(identical(other.note, note) || other.note == note)&&(identical(other.audit, audit) || other.audit == audit));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,category,purchasePrice,purchaseDate,createdAt,note);
+int get hashCode => Object.hash(runtimeType,id,name,category,purchasePrice,purchaseDate,note,audit);
 
 @override
 String toString() {
-  return 'CompanyAsset(id: $id, name: $name, category: $category, purchasePrice: $purchasePrice, purchaseDate: $purchaseDate, createdAt: $createdAt, note: $note)';
+  return 'CompanyAsset(id: $id, name: $name, category: $category, purchasePrice: $purchasePrice, purchaseDate: $purchaseDate, note: $note, audit: $audit)';
 }
 
 
@@ -259,11 +268,11 @@ abstract mixin class _$CompanyAssetCopyWith<$Res> implements $CompanyAssetCopyWi
   factory _$CompanyAssetCopyWith(_CompanyAsset value, $Res Function(_CompanyAsset) _then) = __$CompanyAssetCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, AssetCategory category, double purchasePrice, DateTime purchaseDate, DateTime createdAt, String? note
+ String id, String name, AssetCategory category, double purchasePrice, DateTime purchaseDate, String? note, AuditMetadata audit
 });
 
 
-
+@override $AuditMetadataCopyWith<$Res> get audit;
 
 }
 /// @nodoc
@@ -276,20 +285,29 @@ class __$CompanyAssetCopyWithImpl<$Res>
 
 /// Create a copy of CompanyAsset
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? category = null,Object? purchasePrice = null,Object? purchaseDate = null,Object? createdAt = null,Object? note = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? category = null,Object? purchasePrice = null,Object? purchaseDate = null,Object? note = freezed,Object? audit = null,}) {
   return _then(_CompanyAsset(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,category: null == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
 as AssetCategory,purchasePrice: null == purchasePrice ? _self.purchasePrice : purchasePrice // ignore: cast_nullable_to_non_nullable
 as double,purchaseDate: null == purchaseDate ? _self.purchaseDate : purchaseDate // ignore: cast_nullable_to_non_nullable
-as DateTime,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
 as DateTime,note: freezed == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,audit: null == audit ? _self.audit : audit // ignore: cast_nullable_to_non_nullable
+as AuditMetadata,
   ));
 }
 
+/// Create a copy of CompanyAsset
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$AuditMetadataCopyWith<$Res> get audit {
 
+  return $AuditMetadataCopyWith<$Res>(_self.audit, (value) {
+    return _then(_self.copyWith(audit: value));
+  });
+}
 }
 
 // dart format on

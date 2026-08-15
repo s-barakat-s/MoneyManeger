@@ -17,6 +17,8 @@ import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../debts/application/debt_providers.dart';
+import '../../business/application/business_access_providers.dart';
+import '../../business/domain/permission.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../debts/presentation/widgets/add_debt_dialog.dart';
 import '../../debts/presentation/widgets/delete_debt_dialog.dart';
@@ -70,6 +72,12 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
     final activeReceivablesAsync = ref.watch(owedToUsDebtsProvider);
     final archivedReceivablesAsync = ref.watch(archivedOwedToUsDebtsProvider);
     final summaryAsync = ref.watch(owedToUsDebtSummaryProvider);
+    final canCreate =
+        ref.watch(canProvider(Permission.receivablesCreate)).value == true;
+    final canUpdate =
+        ref.watch(canProvider(Permission.receivablesUpdate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.receivablesArchive)).value == true;
 
     return HomeSummaryHero(
       tag: HomeSummaryHeroTags.receivables,
@@ -84,8 +92,8 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
             children: [
               PageHeader(
                 title: 'Receivables',
-                actionLabel: 'Add receivable',
-                onAction: () => _showAddDialog(context),
+                actionLabel: canCreate ? 'Add receivable' : null,
+                onAction: canCreate ? () => _showAddDialog(context) : null,
               ),
               const SizedBox(height: AppSpacing.md),
               summaryAsync.when(
@@ -133,6 +141,8 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
                         emptyTitle: 'No active receivables',
                         emptyDescription:
                             'Money owed to your business will appear here once added.',
+                        canUpdate: canUpdate,
+                        canArchive: canArchive,
                       ),
                       loading: () => const LoadingSkeleton(itemCount: 4),
                       error: (error, stackTrace) => const ErrorState(
@@ -150,6 +160,8 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
                         emptyTitle: 'No archived receivables',
                         emptyDescription:
                             'Archived receivables will appear here when you archive them.',
+                        canUpdate: canUpdate,
+                        canArchive: canArchive,
                       ),
                       loading: () => const LoadingSkeleton(itemCount: 4),
                       error: (error, stackTrace) => const ErrorState(
@@ -186,7 +198,10 @@ class _ReceivablesPageState extends ConsumerState<ReceivablesPage> {
     _handledQuickAddTrigger = trigger;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _showAddDialog(context);
+        if (ref.read(canProvider(Permission.receivablesCreate)).value ==
+            true) {
+          _showAddDialog(context);
+        }
       }
     });
   }
@@ -275,6 +290,8 @@ class _ReceivablesList extends StatelessWidget {
     required this.onClearFilters,
     required this.emptyTitle,
     required this.emptyDescription,
+    required this.canUpdate,
+    required this.canArchive,
   });
 
   final List<Debt> receivables;
@@ -283,6 +300,8 @@ class _ReceivablesList extends StatelessWidget {
   final VoidCallback onClearFilters;
   final String emptyTitle;
   final String emptyDescription;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -338,8 +357,11 @@ class _ReceivablesList extends StatelessWidget {
       itemCount: visibleReceivables.length,
       separatorBuilder: (context, index) =>
           const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) =>
-          _ReceivableListItem(receivable: visibleReceivables[index]),
+      itemBuilder: (context, index) => _ReceivableListItem(
+        receivable: visibleReceivables[index],
+        canUpdate: canUpdate,
+        canArchive: canArchive,
+      ),
     );
   }
 }
@@ -414,9 +436,15 @@ class _ReceivableFilterSheetState extends State<_ReceivableFilterSheet> {
 }
 
 class _ReceivableListItem extends ConsumerWidget {
-  const _ReceivableListItem({required this.receivable});
+  const _ReceivableListItem({
+    required this.receivable,
+    required this.canUpdate,
+    required this.canArchive,
+  });
 
   final Debt receivable;
+  final bool canUpdate;
+  final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -452,19 +480,22 @@ class _ReceivableListItem extends ConsumerWidget {
               ),
               const SizedBox(width: AppSpacing.sm),
               _StatusBadge(status: status),
-              _ReceivableMenu(
-                receivable: receivable,
-                onEdit: () => _showEditDialog(context, receivable),
-                onArchive: () => _showDeleteDialog(context, receivable),
-                onMarkCollected: remainingAmount > 0
-                    ? () => _showCollectionDialog(
-                        context,
-                        receivable,
-                        remainingAmount,
-                        prefillAmount: remainingAmount,
-                      )
-                    : null,
-              ),
+              if (canUpdate || canArchive)
+                _ReceivableMenu(
+                  receivable: receivable,
+                  canUpdate: canUpdate,
+                  canArchive: canArchive,
+                  onEdit: () => _showEditDialog(context, receivable),
+                  onArchive: () => _showDeleteDialog(context, receivable),
+                  onMarkCollected: canUpdate && remainingAmount > 0
+                      ? () => _showCollectionDialog(
+                          context,
+                          receivable,
+                          remainingAmount,
+                          prefillAmount: remainingAmount,
+                        )
+                      : null,
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -510,7 +541,7 @@ class _ReceivableListItem extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.lg),
-          if (isActive)
+          if (isActive && canUpdate)
             FilledButton.icon(
               onPressed: remainingAmount > 0
                   ? () => _showCollectionDialog(
@@ -522,7 +553,7 @@ class _ReceivableListItem extends ConsumerWidget {
               icon: const Icon(Icons.payments_outlined),
               label: const Text('Collect'),
             )
-          else if (canRestore)
+          else if (canRestore && canUpdate)
             FilledButton.icon(
               onPressed: () => _restoreReceivable(context, ref),
               icon: const Icon(Icons.restore),
@@ -573,8 +604,6 @@ class _ReceivableListItem extends ConsumerWidget {
       await ref.read(createDebtProvider)(
         receivable.copyWith(
           status: DebtStatus.active,
-          archivedAt: null,
-          updatedAt: DateTime.now(),
         ),
       );
     } catch (_) {
@@ -628,7 +657,9 @@ class _ReceivableListItem extends ConsumerWidget {
               ),
               _MetaText(
                 label: 'Created',
-                value: _formatDate(receivable.createdAt),
+                value: receivable.audit.createdAt == null
+                    ? 'Unknown'
+                    : _formatDate(receivable.audit.createdAt!),
               ),
               if (receivable.dueDate != null)
                 _MetaText(
@@ -653,20 +684,22 @@ class _ReceivableListItem extends ConsumerWidget {
 class _ReceivableMenu extends StatelessWidget {
   const _ReceivableMenu({
     required this.receivable,
+    required this.canUpdate,
+    required this.canArchive,
     required this.onEdit,
     required this.onArchive,
     required this.onMarkCollected,
   });
 
   final Debt receivable;
+  final bool canUpdate;
+  final bool canArchive;
   final VoidCallback onEdit;
   final VoidCallback onArchive;
   final VoidCallback? onMarkCollected;
 
   @override
   Widget build(BuildContext context) {
-    final canArchive = receivable.status == DebtStatus.active;
-
     return PopupMenuButton<_ReceivableAction>(
       tooltip: 'More actions',
       icon: const Icon(Icons.more_horiz_rounded),
@@ -680,8 +713,12 @@ class _ReceivableMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(value: _ReceivableAction.edit, child: Text('Edit')),
-        if (canArchive)
+        if (canUpdate)
+          const PopupMenuItem(
+            value: _ReceivableAction.edit,
+            child: Text('Edit'),
+          ),
+        if (canArchive && receivable.status == DebtStatus.active)
           const PopupMenuItem(
             value: _ReceivableAction.archive,
             child: Text('Archive receivable'),

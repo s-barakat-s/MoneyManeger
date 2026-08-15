@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../features/auth/application/auth_providers.dart';
+import '../../features/business/application/business_providers.dart';
 
 enum LastUsedOwnerSelection {
   debtPayment('last_debt_payment_owner_id'),
@@ -17,17 +17,22 @@ enum LastUsedOwnerSelection {
 }
 
 final lastUsedSelectionProvider = Provider<LastUsedSelectionStore>((ref) {
-  final uid = ref.watch(authStateProvider).value?.uid;
-  return LastUsedSelectionStore(uid: uid);
+  String? businessId;
+  try {
+    businessId = ref.watch(activeBusinessIdProvider);
+  } on Object {
+    businessId = null;
+  }
+  return LastUsedSelectionStore(businessId: businessId);
 });
 
 class LastUsedSelectionStore {
-  const LastUsedSelectionStore({required this.uid});
+  const LastUsedSelectionStore({required this.businessId});
 
-  final String? uid;
+  final String? businessId;
 
   Future<String?> read(LastUsedOwnerSelection selection) async {
-    if (uid == null) return null;
+    if (businessId == null) return null;
     try {
       final preferences = await SharedPreferences.getInstance();
       return preferences.getString(_key(selection));
@@ -37,7 +42,7 @@ class LastUsedSelectionStore {
   }
 
   Future<void> save(LastUsedOwnerSelection selection, String ownerId) async {
-    if (uid == null) return;
+    if (businessId == null) return;
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setString(_key(selection), ownerId);
@@ -47,6 +52,6 @@ class LastUsedSelectionStore {
   }
 
   String _key(LastUsedOwnerSelection selection) {
-    return 'user_${uid}_${selection.preferenceKey}';
+    return 'business_${businessId}_${selection.preferenceKey}';
   }
 }

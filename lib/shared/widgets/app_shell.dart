@@ -9,6 +9,8 @@ import '../../core/services/app_update_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../features/business/application/business_access_providers.dart';
+import '../../features/business/domain/permission.dart';
 import '../navigation/root_back_exit.dart';
 import 'bottom_nav_spacer.dart';
 import 'responsive_dialog_content.dart';
@@ -344,14 +346,17 @@ class _MainContent extends StatelessWidget {
   }
 }
 
-class AppSidebar extends StatelessWidget {
+class AppSidebar extends ConsumerWidget {
   const AppSidebar({required this.currentLocation, super.key});
 
   final String currentLocation;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final destinations = _destinations
+        .where((destination) => _canUseDestination(ref, destination))
+        .toList();
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
@@ -367,11 +372,11 @@ class AppSidebar extends StatelessWidget {
               const SizedBox(height: AppSpacing.xxl),
               Expanded(
                 child: ListView.separated(
-                  itemCount: _destinations.length,
+                  itemCount: destinations.length,
                   separatorBuilder: (context, index) =>
                       const SizedBox(height: AppSpacing.xs),
                   itemBuilder: (context, index) {
-                    final destination = _destinations[index];
+                    final destination = destinations[index];
 
                     return _AppSidebarItem(
                       destination: destination,
@@ -490,14 +495,20 @@ class _AppSidebarItem extends StatelessWidget {
   }
 }
 
-class _MobileBottomNav extends StatelessWidget {
+class _MobileBottomNav extends ConsumerWidget {
   const _MobileBottomNav({required this.currentLocation});
 
   final String currentLocation;
 
   @override
-  Widget build(BuildContext context) {
-    final items = _mobileDestinations;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = _mobileDestinations
+        .where((destination) => _canUseDestination(ref, destination))
+        .toList();
+    final quickAddActions = _quickAddActions
+        .where((action) => _can(ref, action.permission))
+        .toList();
+    final splitIndex = (items.length / 2).ceil();
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -515,23 +526,20 @@ class _MobileBottomNav extends StatelessWidget {
         height: AppBottomNavSpacer.navigationBarHeight,
         child: Row(
           children: [
-            _BottomNavItem(
-              destination: items[0],
-              currentLocation: currentLocation,
-            ),
-            _BottomNavItem(
-              destination: items[1],
-              currentLocation: currentLocation,
-            ),
-            const Expanded(child: _CenterQuickAddButton()),
-            _BottomNavItem(
-              destination: items[2],
-              currentLocation: currentLocation,
-            ),
-            _BottomNavItem(
-              destination: items[3],
-              currentLocation: currentLocation,
-            ),
+            for (final destination in items.take(splitIndex))
+              _BottomNavItem(
+                destination: destination,
+                currentLocation: currentLocation,
+              ),
+            if (quickAddActions.isNotEmpty)
+              Expanded(
+                child: _CenterQuickAddButton(actions: quickAddActions),
+              ),
+            for (final destination in items.skip(splitIndex))
+              _BottomNavItem(
+                destination: destination,
+                currentLocation: currentLocation,
+              ),
           ],
         ),
       ),
@@ -590,7 +598,9 @@ class _BottomNavItem extends StatelessWidget {
 }
 
 class _CenterQuickAddButton extends StatefulWidget {
-  const _CenterQuickAddButton();
+  const _CenterQuickAddButton({required this.actions});
+
+  final List<_QuickAddAction> actions;
 
   @override
   State<_CenterQuickAddButton> createState() => _CenterQuickAddButtonState();
@@ -617,6 +627,7 @@ class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
       pageBuilder: (dialogContext, animation, secondaryAnimation) =>
           _QuickAddOverlay(
             layerLink: _layerLink,
+            actions: widget.actions,
             onDismiss: () => Navigator.of(dialogContext).pop(),
             onActionSelected: (action) {
               Navigator.of(dialogContext).pop();
@@ -694,11 +705,13 @@ void _goQuickAdd(GoRouter router, _QuickAddAction action) {
 class _QuickAddOverlay extends StatelessWidget {
   const _QuickAddOverlay({
     required this.layerLink,
+    required this.actions,
     required this.onDismiss,
     required this.onActionSelected,
   });
 
   final LayerLink layerLink;
+  final List<_QuickAddAction> actions;
   final VoidCallback onDismiss;
   final ValueChanged<_QuickAddAction> onActionSelected;
 
@@ -720,7 +733,10 @@ class _QuickAddOverlay extends StatelessWidget {
             targetAnchor: Alignment.topCenter,
             followerAnchor: Alignment.bottomCenter,
             offset: const Offset(0, -12),
-            child: _QuickAddPopover(onActionSelected: onActionSelected),
+            child: _QuickAddPopover(
+              actions: actions,
+              onActionSelected: onActionSelected,
+            ),
           ),
         ],
       ),
@@ -729,8 +745,12 @@ class _QuickAddOverlay extends StatelessWidget {
 }
 
 class _QuickAddPopover extends StatelessWidget {
-  const _QuickAddPopover({required this.onActionSelected});
+  const _QuickAddPopover({
+    required this.actions,
+    required this.onActionSelected,
+  });
 
+  final List<_QuickAddAction> actions;
   final ValueChanged<_QuickAddAction> onActionSelected;
 
   @override
@@ -786,14 +806,14 @@ class _QuickAddPopover extends StatelessWidget {
                       children: [
                         for (
                           var index = 0;
-                          index < _quickAddActions.length;
+                          index < actions.length;
                           index++
                         ) ...[
                           _QuickAddTile(
-                            action: _quickAddActions[index],
+                            action: actions[index],
                             onSelected: onActionSelected,
                           ),
-                          if (index < _quickAddActions.length - 1)
+                          if (index < actions.length - 1)
                             const Divider(height: AppSpacing.lg),
                         ],
                       ],
@@ -919,6 +939,7 @@ class _QuickAddAction {
     required this.color,
     required this.route,
     required this.quickAdd,
+    required this.permission,
   });
 
   final String title;
@@ -927,6 +948,7 @@ class _QuickAddAction {
   final Color color;
   final AppRoute route;
   final String quickAdd;
+  final Permission permission;
 }
 
 const _quickAddActions = [
@@ -937,6 +959,7 @@ const _quickAddActions = [
     color: AppColors.success,
     route: AppRoute.transactions,
     quickAdd: 'income',
+    permission: Permission.transactionsCreate,
   ),
   _QuickAddAction(
     title: 'Add Expense',
@@ -945,6 +968,7 @@ const _quickAddActions = [
     color: AppColors.danger,
     route: AppRoute.transactions,
     quickAdd: 'expense',
+    permission: Permission.transactionsCreate,
   ),
   _QuickAddAction(
     title: 'Transfer Money',
@@ -953,6 +977,7 @@ const _quickAddActions = [
     color: AppColors.primary,
     route: AppRoute.transfers,
     quickAdd: 'transfer',
+    permission: Permission.transfersCreate,
   ),
   _QuickAddAction(
     title: 'Add Debt',
@@ -961,6 +986,7 @@ const _quickAddActions = [
     color: AppColors.danger,
     route: AppRoute.debts,
     quickAdd: 'debt',
+    permission: Permission.debtsCreate,
   ),
   _QuickAddAction(
     title: 'Add Receivable',
@@ -969,6 +995,7 @@ const _quickAddActions = [
     color: AppColors.info,
     route: AppRoute.receivables,
     quickAdd: 'receivable',
+    permission: Permission.receivablesCreate,
   ),
   _QuickAddAction(
     title: 'Add Money Holder',
@@ -977,6 +1004,7 @@ const _quickAddActions = [
     color: AppColors.primary,
     route: AppRoute.owners,
     quickAdd: 'owner',
+    permission: Permission.ownersCreate,
   ),
 ];
 
@@ -994,21 +1022,65 @@ bool _routeMatches(String location, AppRoute route) {
 
 const _destinations = [
   _AppDestination('Dashboard', Icons.dashboard_rounded, AppRoute.dashboard),
-  _AppDestination('Owners', Icons.group_rounded, AppRoute.owners),
+  _AppDestination(
+    'Owners',
+    Icons.group_rounded,
+    AppRoute.owners,
+    permission: Permission.ownersRead,
+  ),
   _AppDestination(
     'Transactions',
     Icons.receipt_long_rounded,
     AppRoute.transactions,
+    permission: Permission.transactionsRead,
   ),
-  _AppDestination('Transfers', Icons.swap_horiz_rounded, AppRoute.transfers),
-  _AppDestination('Debts', Icons.warning_amber_rounded, AppRoute.debts),
-  _AppDestination('Receivables', Icons.payments_rounded, AppRoute.receivables),
+  _AppDestination(
+    'Transfers',
+    Icons.swap_horiz_rounded,
+    AppRoute.transfers,
+    permission: Permission.transfersRead,
+  ),
+  _AppDestination(
+    'Debts',
+    Icons.warning_amber_rounded,
+    AppRoute.debts,
+    permission: Permission.debtsRead,
+  ),
+  _AppDestination(
+    'Receivables',
+    Icons.payments_rounded,
+    AppRoute.receivables,
+    permission: Permission.receivablesRead,
+  ),
   _AppDestination(
     'Company Assets',
     Icons.business_center_rounded,
     AppRoute.companyAssets,
+    permission: Permission.assetsRead,
   ),
-  _AppDestination('Reports', Icons.bar_chart_rounded, AppRoute.reports),
+  _AppDestination(
+    'Reports',
+    Icons.bar_chart_rounded,
+    AppRoute.reports,
+    permission: Permission.reportsRead,
+  ),
+  _AppDestination(
+    'Members',
+    Icons.groups_rounded,
+    AppRoute.members,
+    permission: Permission.membersRead,
+  ),
+  _AppDestination(
+    'Activity',
+    Icons.history_rounded,
+    AppRoute.activity,
+    permission: Permission.activityRead,
+  ),
+  _AppDestination(
+    'Invitations',
+    Icons.mark_email_unread_outlined,
+    AppRoute.invitations,
+  ),
   _AppDestination('Settings', Icons.settings_rounded, AppRoute.settings),
 ];
 
@@ -1024,18 +1096,21 @@ const _primaryMobileDestinations = [
     Icons.receipt_long_outlined,
     AppRoute.transactions,
     selectedIcon: Icons.receipt_long_rounded,
+    permission: Permission.transactionsRead,
   ),
   _AppDestination(
     'Transfers',
     Icons.swap_horiz_outlined,
     AppRoute.transfers,
     selectedIcon: Icons.swap_horiz_rounded,
+    permission: Permission.transfersRead,
   ),
   _AppDestination(
     'Reports',
     Icons.bar_chart_outlined,
     AppRoute.reports,
     selectedIcon: Icons.bar_chart_rounded,
+    permission: Permission.reportsRead,
   ),
 ];
 
@@ -1050,10 +1125,26 @@ bool _isHomeSection(String location) {
 }
 
 class _AppDestination {
-  const _AppDestination(this.label, this.icon, this.route, {this.selectedIcon});
+  const _AppDestination(
+    this.label,
+    this.icon,
+    this.route, {
+    this.selectedIcon,
+    this.permission,
+  });
 
   final String label;
   final IconData icon;
   final AppRoute route;
   final IconData? selectedIcon;
+  final Permission? permission;
+}
+
+bool _canUseDestination(WidgetRef ref, _AppDestination destination) {
+  final permission = destination.permission;
+  return permission == null || _can(ref, permission);
+}
+
+bool _can(WidgetRef ref, Permission permission) {
+  return ref.watch(canProvider(permission)).value == true;
 }
