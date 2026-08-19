@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/owner.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/owner_providers.dart';
@@ -18,6 +19,13 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
   final _nameController = TextEditingController();
   var _isSaving = false;
   String? _errorMessage;
+  late final FinancialFormScopeGuard _scopeGuard;
+
+  @override
+  void initState() {
+    super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
+  }
 
   @override
   void dispose() {
@@ -67,7 +75,9 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
         DialogFormActions(
           primaryLabel: 'Add money holder',
           onPrimaryPressed: _isSaving ? null : _save,
-          onCancelPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          onCancelPressed: _isSaving
+              ? null
+              : () => Navigator.of(context).pop(false),
           isSaving: _isSaving,
         ),
       ],
@@ -79,26 +89,30 @@ class _AddOwnerDialogState extends ConsumerState<AddOwnerDialog> {
       return;
     }
 
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
     });
 
-    final owner = Owner(
-      id: '',
-      name: _nameController.text.trim(),
-    );
+    final owner = Owner(id: '', name: _nameController.text.trim());
 
     try {
       await ref.read(createOwnerProvider)(owner);
 
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(context, 'Money holder added');
+        Navigator.of(context).pop(true);
       }
     } catch (_) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Could not save owner. Please try again.',
+          () => _errorMessage =
+              'Could not save the money holder. Check your permission and connection, then try again.',
         );
       }
     } finally {

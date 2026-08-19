@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../shared/widgets/app_shell.dart';
+import '../../../shared/widgets/empty_state.dart';
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({required this.currentLocation, super.key});
@@ -12,20 +15,19 @@ class ReportsPage extends StatelessWidget {
     return AppShell(
       title: 'Reports',
       currentLocation: currentLocation,
-      child: const _PlaceholderContent(title: 'Reports'),
-    );
-  }
-}
-
-class _PlaceholderContent extends StatelessWidget {
-  const _PlaceholderContent({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+      child: Center(
+        child: EmptyState(
+          icon: Icons.bar_chart_rounded,
+          title: 'Reports are not available yet',
+          description:
+              'Reports will summarize your transaction data. You can review and filter the source records now.',
+          action: FilledButton.icon(
+            onPressed: () => context.push(AppRoute.transactions.path),
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('View transactions'),
+          ),
+        ),
+      ),
     );
   }
 }

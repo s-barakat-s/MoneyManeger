@@ -4,12 +4,14 @@ class BusinessWorkspace {
     required this.businessName,
     required this.roleId,
     required this.roleName,
+    required this.isOwner,
   });
 
   final String businessId;
   final String businessName;
   final String roleId;
   final String roleName;
+  final bool isOwner;
 }
 
 class WorkspaceResolution {
@@ -22,4 +24,13 @@ class WorkspaceResolution {
   final String? selectedBusinessId;
 
   bool get hasSelectedBusiness => selectedBusinessId != null;
+
+  BusinessWorkspace? get selectedWorkspace {
+    final selected = selectedBusinessId;
+    if (selected == null) return null;
+    for (final workspace in workspaces) {
+      if (workspace.businessId == selected) return workspace;
+    }
+    return null;
+  }
 }

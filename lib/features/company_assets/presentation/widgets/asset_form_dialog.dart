@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/audit_metadata.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/company_asset.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/company_asset_providers.dart';
@@ -26,12 +28,14 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   DateTime _purchaseDate = DateTime.now();
   var _isSaving = false;
   String? _errorMessage;
+  late final FinancialFormScopeGuard _scopeGuard;
 
   bool get _isEditing => widget.asset != null;
 
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
 
     final asset = widget.asset;
     if (asset != null) {
@@ -53,9 +57,9 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
+    return AdaptiveFinancialFormDialog(
       title: Text(_isEditing ? 'Edit asset' : 'Add asset'),
+      canDismiss: !_isSaving,
       content: ResponsiveDialogContent(
         child: Form(
           key: _formKey,
@@ -75,6 +79,23 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                 },
               ),
               const SizedBox(height: 12),
+              TextFormField(
+                controller: _priceController,
+                decoration: amountInputDecoration('Purchase value'),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: decimalAmountInputFormatters,
+                validator: (value) {
+                  final price = double.tryParse(value?.trim() ?? '');
+                  if (price == null || price <= 0) {
+                    return 'Enter a valid purchase value';
+                  }
+
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<AssetCategory>(
                 initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
@@ -88,22 +109,6 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
                 onChanged: (value) => setState(() => _category = value),
                 validator: (value) =>
                     value == null ? 'Select a category' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _priceController,
-                decoration: amountInputDecoration('Purchase value'),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  final price = double.tryParse(value?.trim() ?? '');
-                  if (price == null || price <= 0) {
-                    return 'Enter a valid purchase value';
-                  }
-
-                  return null;
-                },
               ),
               const SizedBox(height: 12),
               DialogDateField(
@@ -155,6 +160,11 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       return;
     }
 
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
@@ -181,7 +191,11 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
       }
 
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(
+          context,
+          _isEditing ? 'Asset updated' : 'Asset added',
+        );
+        Navigator.of(context).pop(true);
       }
     } catch (_) {
       if (mounted) {
@@ -197,7 +211,6 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }

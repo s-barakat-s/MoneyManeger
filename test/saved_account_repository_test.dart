@@ -116,4 +116,31 @@ void main() {
       expect(account.providerIds, containsAll(['google.com', 'password']));
     },
   );
+
+  test('normalizes legacy duplicate records sharing one Firebase UID', () async {
+    SharedPreferences.setMockInitialValues({
+      'saved_google_accounts_v1': jsonEncode([
+        {
+          'uid': 'linked-uid',
+          'email': 'linked@example.com',
+          'displayName': 'Linked user',
+          'provider': 'google.com',
+          'lastUsedAt': DateTime.utc(2026, 2).toIso8601String(),
+        },
+        {
+          'uid': 'linked-uid',
+          'email': 'linked@example.com',
+          'username': 'linked_user',
+          'provider': 'password',
+          'lastUsedAt': DateTime.utc(2026, 1).toIso8601String(),
+        },
+      ]),
+    });
+
+    final accounts = await repository.load();
+    expect(accounts, hasLength(1));
+    expect(accounts.single.username, 'linked_user');
+    expect(accounts.single.displayName, 'Linked user');
+    expect(accounts.single.providerIds, containsAll(['google.com', 'password']));
+  });
 }

@@ -26,7 +26,7 @@ class AppUpdateInfo {
 
 class AppUpdateService {
   AppUpdateService({FirebaseRemoteConfig? remoteConfig})
-    : _remoteConfig = remoteConfig ?? FirebaseRemoteConfig.instance;
+    : _remoteConfig = remoteConfig;
 
   static const _latestBuildKey = 'android_latest_build';
   static const _latestVersionKey = 'android_latest_version';
@@ -39,16 +39,21 @@ class AppUpdateService {
   static const _windowsForceUpdateKey = 'windows_force_update';
   static const _windowsUpdateMessageKey = 'windows_update_message';
 
-  final FirebaseRemoteConfig _remoteConfig;
+  final FirebaseRemoteConfig? _remoteConfig;
 
   Future<AppUpdateInfo?> checkForUpdate() async {
     final platform = _currentPlatform();
-    if (platform == AppUpdatePlatform.unsupported) {
+    if (platform != AppUpdatePlatform.android) {
       return null;
     }
 
+    // Remote Config's native Windows implementation can surface repeated
+    // certificate-revocation dialogs. Update checks are intentionally Android
+    // only until that native path is suitable for the Windows product.
+    final remoteConfig = _remoteConfig ?? FirebaseRemoteConfig.instance;
+
     try {
-      await _remoteConfig.setConfigSettings(
+      await remoteConfig.setConfigSettings(
         RemoteConfigSettings(
           fetchTimeout: const Duration(seconds: 10),
           minimumFetchInterval: kDebugMode
@@ -56,7 +61,7 @@ class AppUpdateService {
               : const Duration(hours: 1),
         ),
       );
-      await _remoteConfig.setDefaults(const {
+      await remoteConfig.setDefaults(const {
         _latestBuildKey: 1,
         _latestVersionKey: '1.0.0',
         _apkUrlKey: '',
@@ -68,13 +73,13 @@ class AppUpdateService {
         _windowsForceUpdateKey: false,
         _windowsUpdateMessageKey: '',
       });
-      await _remoteConfig.fetchAndActivate();
+      await remoteConfig.fetchAndActivate();
 
       final packageInfo = await PackageInfo.fromPlatform();
       final keys = _keysFor(platform);
-      final latestBuild = _remoteConfig.getInt(keys.latestBuild);
-      final latestVersion = _remoteConfig.getString(keys.latestVersion).trim();
-      final downloadUrl = _remoteConfig.getString(keys.downloadUrl).trim();
+      final latestBuild = remoteConfig.getInt(keys.latestBuild);
+      final latestVersion = remoteConfig.getString(keys.latestVersion).trim();
+      final downloadUrl = remoteConfig.getString(keys.downloadUrl).trim();
 
       if (!_isUpdateAvailable(
             installedBuild: packageInfo.buildNumber,
@@ -91,8 +96,8 @@ class AppUpdateService {
         latestBuild: latestBuild,
         latestVersion: latestVersion,
         downloadUrl: downloadUrl,
-        message: _remoteConfig.getString(keys.message).trim(),
-        forceUpdate: _remoteConfig.getBool(keys.forceUpdate),
+        message: remoteConfig.getString(keys.message).trim(),
+        forceUpdate: remoteConfig.getBool(keys.forceUpdate),
       );
     } catch (error, stackTrace) {
       if (kDebugMode) {

@@ -25,6 +25,7 @@ import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/account_switcher_bottom_sheet.dart';
 import '../../business/application/business_access_providers.dart';
 import '../../business/domain/permission.dart';
+import '../../business/presentation/workspace_switcher_card.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({required this.currentLocation, super.key});
@@ -38,6 +39,7 @@ class SettingsPage extends ConsumerWidget {
     return AppShell(
       title: 'Settings',
       currentLocation: currentLocation,
+      secondaryParent: AppRoute.dashboard,
       showMobileAppBarTitle: false,
       child: authState.when(
         data: (user) {
@@ -48,7 +50,9 @@ class SettingsPage extends ConsumerWidget {
           return _SettingsContent(user: user);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => _SettingsError(message: error.toString()),
+        error: (error, stackTrace) => const _SettingsError(
+          message: 'Settings could not be loaded. Please try again.',
+        ),
       ),
     );
   }
@@ -83,6 +87,12 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     final hasPassword = currentUser.providerData.any(
       (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
     );
+    final hasGoogle = currentUser.providerData.any(
+      (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
+    );
+    final canOfferPasswordAction =
+        hasPassword ||
+        (hasGoogle && defaultTargetPlatform != TargetPlatform.windows);
     final canReadMembers =
         ref.watch(canProvider(Permission.membersRead)).value == true;
     final canReadActivity =
@@ -96,98 +106,57 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
         children: [
           const PageHeader(
             title: 'Settings',
-            subtitle: 'Manage your account and app preferences',
+            subtitle: 'Manage your account, Current Business, and app.',
           ),
           const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('Account'),
+          const SizedBox(height: AppSpacing.sm),
           _AccountCard(
             name: name,
             email: email,
             photoUrl: widget.user.photoURL,
             onEdit: () => _showEditProfileDialog(context, name),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          const _SectionTitle('Business'),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           _SettingsCard(
             child: Column(
               children: [
-                if (canReadMembers) ...[
-                  _SettingsTile(
-                    icon: Icons.groups_rounded,
-                    iconColor: AppColors.primary,
-                    title: 'Business members',
-                    subtitle: 'View roles and team access.',
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => context.push(AppRoute.members.path),
-                  ),
-                  const Divider(height: AppSpacing.xl),
-                ],
-                if (canReadActivity) ...[
-                  _SettingsTile(
-                    icon: Icons.history_rounded,
-                    iconColor: AppColors.primary,
-                    title: 'Activity',
-                    subtitle: 'Review Business changes and team actions.',
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => context.push(AppRoute.activity.path),
-                  ),
-                  const Divider(height: AppSpacing.xl),
-                ],
                 _SettingsTile(
                   icon: Icons.mark_email_unread_outlined,
                   iconColor: AppColors.info,
-                  title: 'Invitations',
-                  subtitle: 'View invitations sent to your account.',
+                  title: 'Received invitations',
+                  subtitle: 'View Business invitations sent to this account.',
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => context.push(AppRoute.invitations.path),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const _SectionTitle('Appearance'),
-          const SizedBox(height: AppSpacing.sm),
-          _SettingsCard(
-            child: _SettingsTile(
-              icon: Icons.dark_mode_rounded,
-              iconColor: AppColors.primary,
-              title: 'Appearance',
-              subtitle: _themeModeLabel(themeMode),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => _showThemeModeDialog(context, themeMode),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          const _SectionTitle('Account'),
-          const SizedBox(height: AppSpacing.sm),
-          _SettingsCard(
-            child: Column(
-              children: [
-                _SettingsTile(
-                  icon: Icons.password_rounded,
-                  iconColor: AppColors.primary,
-                  title: hasPassword ? 'Change password' : 'Set password',
-                  subtitle: hasPassword
-                      ? 'Update your app account password.'
-                      : 'Create a password to sign in without Google.',
-                  trailing: _isSettingPassword
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.chevron_right_rounded),
-                  onTap: _isSettingPassword
-                      ? null
-                      : hasPassword
-                      ? _changePassword
-                      : _setPassword,
-                ),
+                if (canOfferPasswordAction) ...[
+                  const Divider(height: AppSpacing.xl),
+                  _SettingsTile(
+                    icon: Icons.password_rounded,
+                    iconColor: AppColors.primary,
+                    title: hasPassword ? 'Change password' : 'Set password',
+                    subtitle: hasPassword
+                        ? 'Update your account password.'
+                        : 'Create a password to sign in without Google.',
+                    trailing: _isSettingPassword
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.chevron_right_rounded),
+                    onTap: _isSettingPassword
+                        ? null
+                        : hasPassword
+                        ? _changePassword
+                        : _setPassword,
+                  ),
+                ],
                 const Divider(height: AppSpacing.xl),
                 _SettingsTile(
                   icon: Icons.switch_account_outlined,
                   iconColor: AppColors.primary,
                   title: 'Switch account',
-                  subtitle: 'Choose another Google account',
+                  subtitle: 'Choose another saved account.',
                   trailing: isSwitching
                       ? const SizedBox.square(
                           dimension: 20,
@@ -203,7 +172,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                   icon: Icons.logout_rounded,
                   iconColor: AppColors.danger,
                   title: 'Log out',
-                  subtitle: 'Sign out of this account',
+                  subtitle: 'Sign out of this account.',
                   trailing: _isSigningOut
                       ? const SizedBox.square(
                           dimension: 20,
@@ -213,6 +182,51 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                   onTap: _isSigningOut || isSwitching ? null : _signOut,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('Business'),
+          const SizedBox(height: AppSpacing.sm),
+          const WorkspaceSwitcherCard(),
+          const SizedBox(height: AppSpacing.md),
+          if (canReadMembers || canReadActivity)
+            _SettingsCard(
+              child: Column(
+                children: [
+                  if (canReadMembers)
+                    _SettingsTile(
+                      icon: Icons.groups_rounded,
+                      iconColor: AppColors.primary,
+                      title: 'Business members',
+                      subtitle: 'View roles and team access.',
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => context.push(AppRoute.members.path),
+                    ),
+                  if (canReadMembers && canReadActivity)
+                    const Divider(height: AppSpacing.xl),
+                  if (canReadActivity)
+                    _SettingsTile(
+                      icon: Icons.history_rounded,
+                      iconColor: AppColors.primary,
+                      title: 'Business activity',
+                      subtitle: 'Review changes in the Current Business.',
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => context.push(AppRoute.activity.path),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: AppSpacing.xl),
+          const _SectionTitle('App'),
+          const SizedBox(height: AppSpacing.sm),
+          _SettingsCard(
+            child: _SettingsTile(
+              icon: Icons.dark_mode_rounded,
+              iconColor: AppColors.primary,
+              title: 'Appearance',
+              subtitle: _themeModeLabel(themeMode),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _showThemeModeDialog(context, themeMode),
             ),
           ),
         ],
@@ -455,93 +469,105 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Set app password'),
-      content: Form(
-        key: _formKey,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                initialValue: widget.email,
-                enabled: false,
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: 'New password',
-                  suffixIcon: IconButton(
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: AlertDialog(
+        scrollable: true,
+        title: const Text('Set app password'),
+        content: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  initialValue: widget.email,
+                  enabled: false,
+                  decoration: const InputDecoration(labelText: 'Email'),
                 ),
-                validator: _validateNewPassword,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _confirmationController,
-                obscureText: _obscureConfirmation,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  labelText: 'Confirm new password',
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(
-                      () => _obscureConfirmation = !_obscureConfirmation,
-                    ),
-                    icon: Icon(
-                      _obscureConfirmation
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                ),
-                validator: (value) {
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match.';
-                  }
-                  return _validateNewPassword(value);
-                },
-                onFieldSubmitted: (_) {
-                  if (!_isSubmitting) _submit();
-                },
-              ),
-              if (_message != null) ...[
                 const SizedBox(height: AppSpacing.md),
-                Text(
-                  _message!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: 'New password',
+                    suffixIcon: IconButton(
+                      tooltip: _obscurePassword
+                          ? 'Show new password'
+                          : 'Hide new password',
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: _validateNewPassword,
                 ),
+                const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  controller: _confirmationController,
+                  obscureText: _obscureConfirmation,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm new password',
+                    suffixIcon: IconButton(
+                      tooltip: _obscureConfirmation
+                          ? 'Show password confirmation'
+                          : 'Hide password confirmation',
+                      onPressed: () => setState(
+                        () => _obscureConfirmation = !_obscureConfirmation,
+                      ),
+                      icon: Icon(
+                        _obscureConfirmation
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match.';
+                    }
+                    return _validateNewPassword(value);
+                  },
+                  onFieldSubmitted: (_) {
+                    if (!_isSubmitting) _submit();
+                  },
+                ),
+                if (_message != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _message!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _isSubmitting ? null : _submit,
+            child: _isSubmitting
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Set password'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Set password'),
-        ),
-      ],
     );
   }
 
@@ -620,124 +646,136 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     final isBusy = _isSubmitting || _isSendingReset;
-    return AlertDialog(
-      title: const Text('Change password'),
-      content: Form(
-        key: _formKey,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _currentPasswordController,
-                  obscureText: _obscureCurrentPassword,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Current password',
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(
-                        () =>
-                            _obscureCurrentPassword = !_obscureCurrentPassword,
+    return PopScope(
+      canPop: !isBusy,
+      child: AlertDialog(
+        title: const Text('Change password'),
+        content: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _currentPasswordController,
+                    obscureText: _obscureCurrentPassword,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'Current password',
+                      suffixIcon: IconButton(
+                        tooltip: _obscureCurrentPassword
+                            ? 'Show current password'
+                            : 'Hide current password',
+                        onPressed: () => setState(
+                          () => _obscureCurrentPassword =
+                              !_obscureCurrentPassword,
+                        ),
+                        icon: Icon(
+                          _obscureCurrentPassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
                       ),
-                      icon: Icon(
-                        _obscureCurrentPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                    ),
+                    validator: (value) => (value ?? '').isEmpty
+                        ? 'Current password is required.'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: _newPasswordController,
+                    obscureText: _obscureNewPassword,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'New password',
+                      suffixIcon: IconButton(
+                        tooltip: _obscureNewPassword
+                            ? 'Show new password'
+                            : 'Hide new password',
+                        onPressed: () => setState(
+                          () => _obscureNewPassword = !_obscureNewPassword,
+                        ),
+                        icon: Icon(
+                          _obscureNewPassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                    validator: _validateNewPassword,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    controller: _confirmationController,
+                    obscureText: _obscureConfirmation,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm new password',
+                      suffixIcon: IconButton(
+                        tooltip: _obscureConfirmation
+                            ? 'Show password confirmation'
+                            : 'Hide password confirmation',
+                        onPressed: () => setState(
+                          () => _obscureConfirmation = !_obscureConfirmation,
+                        ),
+                        icon: Icon(
+                          _obscureConfirmation
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value != _newPasswordController.text) {
+                        return 'Passwords do not match.';
+                      }
+                      return _validateNewPassword(value);
+                    },
+                    onFieldSubmitted: (_) {
+                      if (!isBusy) _submit();
+                    },
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: isBusy ? null : _sendPasswordReset,
+                      child: Text(
+                        _isSendingReset
+                            ? 'Sending reset link...'
+                            : 'Forgot your current password?',
                       ),
                     ),
                   ),
-                  validator: (value) => (value ?? '').isEmpty
-                      ? 'Current password is required.'
-                      : null,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _newPasswordController,
-                  obscureText: _obscureNewPassword,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'New password',
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(
-                        () => _obscureNewPassword = !_obscureNewPassword,
-                      ),
-                      icon: Icon(
-                        _obscureNewPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                  if (_message != null)
+                    Text(
+                      _message!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
                     ),
-                  ),
-                  validator: _validateNewPassword,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _confirmationController,
-                  obscureText: _obscureConfirmation,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm new password',
-                    suffixIcon: IconButton(
-                      onPressed: () => setState(
-                        () => _obscureConfirmation = !_obscureConfirmation,
-                      ),
-                      icon: Icon(
-                        _obscureConfirmation
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value != _newPasswordController.text) {
-                      return 'Passwords do not match.';
-                    }
-                    return _validateNewPassword(value);
-                  },
-                  onFieldSubmitted: (_) {
-                    if (!isBusy) _submit();
-                  },
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: isBusy ? null : _sendPasswordReset,
-                    child: Text(
-                      _isSendingReset
-                          ? 'Sending reset link...'
-                          : 'Forgot your current password?',
-                    ),
-                  ),
-                ),
-                if (_message != null)
-                  Text(
-                    _message!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: isBusy ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: isBusy ? null : _submit,
+            child: _isSubmitting
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Change password'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: isBusy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: isBusy ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Change password'),
-        ),
-      ],
     );
   }
 
@@ -1007,56 +1045,62 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Edit username'),
-      content: Form(
-        key: _formKey,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'your_username',
+    return PopScope(
+      canPop: !_isSaving,
+      child: AlertDialog(
+        scrollable: true,
+        title: const Text('Edit username'),
+        content: Form(
+          key: _formKey,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    hintText: 'your_username',
+                  ),
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  ],
+                  validator: _validateUsername,
+                  onFieldSubmitted: (_) {
+                    if (!_isSaving) _save();
+                  },
                 ),
-                textInputAction: TextInputAction.done,
-                inputFormatters: [
-                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                if (_message != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    _message!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ],
-                validator: _validateUsername,
-                onFieldSubmitted: (_) {
-                  if (!_isSaving) _save();
-                },
-              ),
-              if (_message != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  _message!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
               ],
-            ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _isSaving ? null : _save,
+            child: _isSaving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _isSaving ? null : _save,
-          child: _isSaving
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 
@@ -1081,7 +1125,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         messenger.showSnackBar(
-          const SnackBar(content: Text('Username updated successfully.')),
+          const SnackBar(content: Text('Profile updated')),
         );
       }
     } on UsernameAlreadyTakenException {

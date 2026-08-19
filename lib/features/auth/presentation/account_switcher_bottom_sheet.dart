@@ -182,7 +182,8 @@ class AccountSwitcherBottomSheet extends ConsumerWidget {
         title: const Text('Remove saved accounts?'),
         content: const Text(
           'This removes account names and email addresses saved on this '
-          'device. It does not delete accounts or financial data.',
+          'device. It does not delete accounts or financial data, and you '
+          'will remain signed in to the current account.',
         ),
         actions: [
           TextButton(
@@ -290,7 +291,7 @@ class _SavedAccountTile extends StatelessWidget {
 
   String _providerLabel(SavedAccount account) {
     if (account.supportsGoogleSignIn && account.supportsPasswordSignIn) {
-      return 'Google / Email & Password';
+      return 'Google + Email & Password';
     }
     if (account.supportsGoogleSignIn) return 'Google';
     if (account.supportsPasswordSignIn) return 'Email & Password';

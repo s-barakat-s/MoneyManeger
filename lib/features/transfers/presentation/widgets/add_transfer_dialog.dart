@@ -2,12 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/owner.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/transfer.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
+import '../../../business/application/business_access_providers.dart';
+import '../../../business/domain/permission.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
+import '../../../owners/presentation/widgets/add_owner_dialog.dart';
 import '../../application/transfer_providers.dart';
 
 class AddTransferDialog extends ConsumerStatefulWidget {
@@ -23,10 +27,16 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
   final _noteController = TextEditingController();
   String? _fromOwnerId;
   String? _toOwnerId;
-  bool _didInitializeOwners = false;
+  late final FinancialFormScopeGuard _scopeGuard;
   DateTime _date = DateTime.now();
   var _isSaving = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
+  }
 
   @override
   void dispose() {
@@ -39,21 +49,27 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
-    return AlertDialog(
-      scrollable: true,
-      title: const Text('Add transfer'),
+    return AdaptiveFinancialFormDialog(
+      title: const Text('Transfer money'),
+      canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
           if (owners.length < 2) {
-            return ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: const Text(
-                'Add at least two money holders before creating a transfer.',
-              ),
+            final canCreateHolder =
+                ref.watch(canProvider(Permission.ownersCreate)).value == true;
+            return FinancialPrecondition(
+              message: owners.isEmpty
+                  ? 'No money holders yet. Create at least two before making a transfer.'
+                  : 'A transfer needs two money holders. Create another holder to continue.',
+              actionLabel: canCreateHolder ? 'Create money holder' : null,
+              onAction: canCreateHolder
+                  ? () => showDialog<bool>(
+                      context: context,
+                      builder: (context) => const AddOwnerDialog(),
+                    )
+                  : null,
             );
           }
-
-          _initializeOwners(owners);
 
           return _TransferForm(
             formKey: _formKey,
@@ -73,13 +89,19 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
           height: 96,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (error, stackTrace) => Text(error.toString()),
+        error: (error, stackTrace) => FinancialFormLoadError(
+          onRetry: () => ref.invalidate(ownersStreamProvider),
+        ),
       ),
       actions: [
         DialogFormActions(
-          primaryLabel: 'Add transfer',
-          onPrimaryPressed: _isSaving ? null : _save,
-          onCancelPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          primaryLabel: 'Transfer money',
+          onPrimaryPressed: _isSaving || (ownersAsync.value?.length ?? 0) < 2
+              ? null
+              : _save,
+          onCancelPressed: _isSaving
+              ? null
+              : () => Navigator.of(context).pop(false),
           isSaving: _isSaving,
         ),
       ],
@@ -88,6 +110,11 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
 
   Future<void> _save() async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
       return;
     }
 
@@ -110,14 +137,9 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
         ),
       );
 
-      final selections = ref.read(lastUsedSelectionProvider);
-      await Future.wait([
-        selections.save(LastUsedOwnerSelection.transferFrom, _fromOwnerId!),
-        selections.save(LastUsedOwnerSelection.transferTo, _toOwnerId!),
-      ]);
-
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(context, 'Transfer completed');
+        Navigator.of(context).pop(true);
       }
     } on FirebaseException catch (error) {
       if (mounted) {
@@ -144,48 +166,6 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
         'Firestore did not confirm this save. Please try again.',
       _ => 'Could not save (${error.code}). Please try again.',
     };
-  }
-
-  void _initializeOwners(List<Owner> owners) {
-    if (_didInitializeOwners) {
-      return;
-    }
-    _didInitializeOwners = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final selections = ref.read(lastUsedSelectionProvider);
-      final remembered = await Future.wait([
-        selections.read(LastUsedOwnerSelection.transferFrom),
-        selections.read(LastUsedOwnerSelection.transferTo),
-      ]);
-      if (!mounted) {
-        return;
-      }
-
-      final rememberedFrom = remembered[0];
-      final rememberedTo = remembered[1];
-      final currentFromIsValid = owners.any(
-        (owner) => owner.id == _fromOwnerId,
-      );
-      final currentToIsValid = owners.any((owner) => owner.id == _toOwnerId);
-      final fromId = currentFromIsValid
-          ? _fromOwnerId!
-          : owners.any((owner) => owner.id == rememberedFrom)
-          ? rememberedFrom!
-          : owners.first.id;
-      final toId = currentToIsValid && _toOwnerId != fromId
-          ? _toOwnerId
-          : owners.any(
-              (owner) => owner.id == rememberedTo && owner.id != fromId,
-            )
-          ? rememberedTo
-          : owners.where((owner) => owner.id != fromId).first.id;
-
-      setState(() {
-        _fromOwnerId = fromId;
-        _toOwnerId = toId;
-      });
-    });
   }
 }
 
@@ -266,6 +246,7 @@ class _TransferForm extends StatelessWidget {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              inputFormatters: decimalAmountInputFormatters,
               validator: (value) {
                 final amount = double.tryParse(value?.trim() ?? '');
                 if (amount == null || amount <= 0) {
@@ -322,7 +303,6 @@ class _TransferForm extends StatelessWidget {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }

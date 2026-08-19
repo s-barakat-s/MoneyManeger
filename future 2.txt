@@ -1,0 +1,851 @@
+# Project Recovery & Continuation Report
+
+**Snapshot date:** August 16, 2026
+**Purpose:** This document is a complete recovery/context snapshot. If the current chat, context file, task history, or agent state is lost, provide this document to the next agent before making further changes.
+
+---
+
+# 1. Current Project Architecture
+
+The application is a Flutter application using:
+
+* Flutter
+* Riverpod 3
+* GoRouter
+* Freezed
+* Firebase Authentication
+* Cloud Firestore
+* Repository-based data access
+* `BusinessDataScope` for Business-scoped data
+* Deno HTTP backend for operations that require trusted server-side execution
+
+Business data is primarily scoped beneath:
+
+```text
+businesses/{businessId}
+```
+
+User profile data is stored separately under:
+
+```text
+userProfiles/{uid}
+```
+
+The old:
+
+```text
+users/{uid}
+```
+
+hierarchy is obsolete and must not be treated as the active user-profile schema.
+
+---
+
+# 2. Business Backend Migration Context
+
+The project previously depended on Firebase callable Cloud Functions for several Business operations.
+
+The Firebase Functions were Firebase v2 callables deployed/configured around:
+
+```text
+europe-west1
+```
+
+Operations analyzed included workspace, invitation, member, activity, and identity-related functionality.
+
+A key architectural conclusion was:
+
+> Moving everything directly from Firebase Functions to client-side Firestore is NOT a safe drop-in migration.
+
+Some operations require trusted backend authority because Firestore Rules alone cannot safely reproduce all existing authorization and data-integrity guarantees.
+
+Examples include operations involving:
+
+* membership authorization
+* private profile access
+* Business owner protection
+* canonical/system roles
+* invitation recipient identity
+* Activity integrity
+* username → email resolution
+
+Therefore the migration strategy is:
+
+```text
+Flutter client
+    ↓
+Repository abstraction
+    ↓
+Deno HTTP API where trusted authority is required
+    ↓
+Firebase / Firestore
+```
+
+rather than blindly replacing every callable with direct Firestore reads/writes.
+
+---
+
+# 3. Important Data Model Findings
+
+The active profile hierarchy is:
+
+```text
+userProfiles/{uid}
+```
+
+An obsolete callable implementation was found reading:
+
+```text
+users/{uid}
+```
+
+This is inconsistent with the current schema and Firestore Rules.
+
+Therefore username/email resolution must NOT simply be migrated by copying the old implementation.
+
+Longer-term architecture may require concepts such as:
+
+* Business-scoped member profile projections
+* recipient-safe invitation denormalization
+* caller-owned workspace projections or carefully constrained collection-group access
+* immutable/versioned system roles
+* deterministic Activity linkage
+* redesign/removal of username login where necessary
+
+These are architectural concerns and must not be changed casually while fixing unrelated bugs.
+
+---
+
+# 4. Current Workspace Migration
+
+The Business workspace resolution flow has already been migrated in the CURRENT SOURCE CODE.
+
+The desired implementation is:
+
+```text
+HttpBusinessWorkspaceRepository
+    ↓
+GET /api/workspaces
+```
+
+The Flutter application should no longer resolve the current user's Business workspaces using the legacy Firebase callable:
+
+```text
+resolveMyBusinessWorkspaces
+```
+
+The current source has been checked and does not contain workspace callable references in the relevant workspace resolution path.
+
+---
+
+# 5. Current Production Workspace Endpoint
+
+The Deno production endpoint:
+
+```text
+GET /api/workspaces
+```
+
+has been tested directly.
+
+Result:
+
+```text
+HTTP success
+```
+
+It returned:
+
+```text
+workspaces: 1
+```
+
+and returned a valid active Business.
+
+Observed response time during diagnosis was approximately:
+
+```text
+1.7 seconds
+```
+
+Therefore the Deno workspace resolver itself is healthy.
+
+Do NOT modify the Deno resolver merely because the Flutter app fails after restart.
+
+---
+
+# 6. Exact Failure That Was Investigated
+
+The application appeared to work immediately after the Phase 1 workspace migration.
+
+The Business could be created/opened successfully.
+
+However, after FULLY closing the application and starting it again, Business workspace resolution failed.
+
+Runtime inspection showed that after restart the application executed:
+
+```text
+CallableBusinessWorkspaceRepository
+    ↓
+httpsCallable('resolveMyBusinessWorkspaces')
+```
+
+It did NOT execute:
+
+```text
+HttpBusinessWorkspaceRepository
+    ↓
+GET /api/workspaces
+```
+
+Therefore:
+
+```text
+workspaceResolutionProvider
+```
+
+was still reaching the obsolete Firebase callable implementation after a cold restart.
+
+---
+
+# 7. Root Cause
+
+This was NOT a source-code regression.
+
+This was NOT a Deno backend failure.
+
+This was NOT a Firestore data issue.
+
+This was NOT a production-data issue.
+
+The root cause was an OLD INSTALLED APK.
+
+The Phase 1 migration had been introduced into the currently running Flutter process through hot reload/hot restart behavior, but the installed Android application artifact itself had not been rebuilt with the new source.
+
+The installed APK was inspected.
+
+Its:
+
+```text
+kernel_blob.bin
+```
+
+contained references to:
+
+```text
+resolveMyBusinessWorkspaces
+CallableBusinessWorkspaceRepository
+```
+
+The installed APK did NOT contain the expected Deno HTTP workspace implementation information such as the Deno hostname / workspace HTTP route.
+
+Therefore the physical APK installed on the device was from the pre-migration implementation.
+
+---
+
+# 8. Why It Worked Before Closing the App
+
+This explains the seemingly contradictory behavior.
+
+The successful process was:
+
+```text
+PID 26774
+```
+
+That running process contained the hot-reloaded Phase 1 Deno migration.
+
+Therefore it successfully:
+
+* created/opened the Business
+* resolved the workspace through the migrated implementation
+
+But when the application was fully terminated:
+
+```text
+PID 26774
+```
+
+was destroyed.
+
+On the next launch Android started:
+
+```text
+PID 30603
+```
+
+from the APK physically installed on the device.
+
+That APK was old.
+
+Therefore the application restored:
+
+```text
+CallableBusinessWorkspaceRepository
+→ resolveMyBusinessWorkspaces
+```
+
+instead of:
+
+```text
+HttpBusinessWorkspaceRepository
+→ GET /api/workspaces
+```
+
+This is why:
+
+```text
+Hot-loaded process = works
+Cold restart = fails
+```
+
+---
+
+# 9. Critical Conclusion
+
+The workspace migration is already correct in CURRENT SOURCE.
+
+The current failure is caused by artifact/version mismatch:
+
+```text
+CURRENT SOURCE
+    ✅ HttpBusinessWorkspaceRepository
+    ✅ GET /api/workspaces
+
+INSTALLED APK
+    ❌ CallableBusinessWorkspaceRepository
+    ❌ resolveMyBusinessWorkspaces
+```
+
+No source-code fix is required for this specific bug.
+
+---
+
+# 10. Changed Files for This Bug
+
+No permanent source changes were required.
+
+Temporary diagnostic logging used during investigation was removed.
+
+Therefore:
+
+```text
+Changed files required for bug fix: NONE
+```
+
+Do not introduce arbitrary client/backend changes attempting to fix this issue.
+
+---
+
+# 11. Production Changes
+
+No Deno backend changes were made as part of this diagnosis.
+
+No production database mutations were made.
+
+No production Business data was modified.
+
+No destructive operations were performed.
+
+---
+
+# 12. Verification Already Completed
+
+The following checks have already been completed:
+
+### Deno API
+
+```text
+Production GET /api/workspaces
+```
+
+Result:
+
+```text
+HTTP success
+```
+
+Returned:
+
+```text
+1 workspace
+```
+
+Returned active Business:
+
+```text
+valid
+```
+
+---
+
+### Installed APK
+
+The installed APK was inspected.
+
+Its Flutter kernel contains:
+
+```text
+resolveMyBusinessWorkspaces
+CallableBusinessWorkspaceRepository
+```
+
+This confirms the installed application still contains the legacy implementation.
+
+---
+
+### Current Source
+
+The current Flutter source was checked.
+
+The expected workspace path is:
+
+```text
+HttpBusinessWorkspaceRepository
+→ GET /api/workspaces
+```
+
+No relevant workspace callable references remain in the current source path.
+
+---
+
+### Static Analysis
+
+Targeted analysis of the three relevant workspace client/provider files completed successfully.
+
+Result:
+
+```text
+no issues
+```
+
+---
+
+### Git Validation
+
+Executed:
+
+```text
+git diff --check
+```
+
+Result:
+
+```text
+passed
+```
+
+---
+
+# 13. Why Final Runtime Verification Has Not Yet Been Performed
+
+A completely fresh APK has NOT yet been built and installed during the diagnostic task.
+
+Reason:
+
+> Broad Flutter builds were explicitly prohibited during that task.
+
+Therefore the final cold-start verification intentionally remains outstanding.
+
+This is NOT evidence that the migration failed.
+
+It simply means the correct current source has not yet replaced the stale APK installed on the device.
+
+---
+
+# 14. Required Next Action
+
+The next step is NOT another code modification.
+
+The next step is to install/run a fresh APK generated from the CURRENT SOURCE.
+
+For normal debug execution this can be done using:
+
+```bash
+flutter run
+```
+
+The important distinction is:
+
+```text
+fresh build/install
+```
+
+rather than:
+
+```text
+hot reload of the existing stale installed artifact
+```
+
+If necessary, the old application can be uninstalled first so there is no ambiguity about which artifact Android is launching.
+
+---
+
+# 15. Required Cold-Restart Verification
+
+After installing the fresh current build:
+
+1. Launch the application.
+
+2. Authenticate normally.
+
+3. Open/create/select the Business as appropriate.
+
+4. Confirm workspace resolution reaches:
+
+```text
+GET /api/workspaces
+```
+
+5. Confirm the Business opens correctly.
+
+6. Fully terminate the application.
+
+Not merely navigating away.
+
+The application process must actually terminate.
+
+7. Launch the application again.
+
+8. Verify startup workspace resolution again.
+
+Expected:
+
+```text
+HttpBusinessWorkspaceRepository
+→ GET /api/workspaces
+```
+
+Forbidden/incorrect:
+
+```text
+CallableBusinessWorkspaceRepository
+→ resolveMyBusinessWorkspaces
+```
+
+9. Confirm the active Business is restored correctly.
+
+If this succeeds after a complete process restart, Phase 1 workspace migration can be considered persisted and verified in the actual Android artifact.
+
+---
+
+# 16. Important Rule for Future Debugging
+
+Do not assume:
+
+```text
+works after hot reload
+```
+
+means:
+
+```text
+installed APK contains the change
+```
+
+These are different states.
+
+When behavior differs between:
+
+```text
+hot reload/hot restart
+```
+
+and:
+
+```text
+full process termination + relaunch
+```
+
+verify the installed artifact before debugging the backend.
+
+Relevant things to compare include:
+
+```text
+current source
+running process
+installed APK
+```
+
+These can temporarily represent three different code states during Flutter development.
+
+---
+
+# 17. Firebase Callable Migration Status
+
+The project has been undergoing migration away from Firebase callable Functions where appropriate.
+
+However, each callable must be evaluated individually.
+
+Do NOT apply the assumption:
+
+```text
+Firebase callable
+→ direct Firestore
+```
+
+Some operations still require trusted backend execution.
+
+Previously identified operations requiring special care/trusted backend behavior include functionality around:
+
+```text
+resolveUsernameEmail
+listBusinessActivity
+listBusinessMembers
+createBusinessInvitation
+```
+
+The original Firebase Functions deployment path had a billing constraint:
+
+```text
+Blaze billing required
+```
+
+and corresponding Firestore Rules prevent simply doing unsafe equivalent operations directly from the Flutter client.
+
+The Deno backend exists partly to provide the trusted execution environment required for these flows.
+
+---
+
+# 18. Security / Architecture Principles That Must Be Preserved
+
+Future agents must NOT weaken Firestore Rules merely to make a client-side implementation work.
+
+Specifically preserve protection around:
+
+* Business membership
+* private user-profile data
+* owner membership/role protection
+* system/canonical roles
+* invitation identity
+* Activity/event integrity
+* cross-Business isolation
+
+Avoid exposing global profile data to solve Business member-list UX.
+
+Prefer appropriately scoped/denormalized data when necessary.
+
+Do not blindly restore obsolete:
+
+```text
+users/{uid}
+```
+
+reads.
+
+Current user profile architecture is based on:
+
+```text
+userProfiles/{uid}
+```
+
+---
+
+# 19. Repository Boundary
+
+Business/network operations should continue going through repository abstractions.
+
+For workspace resolution the intended dependency is:
+
+```text
+workspaceResolutionProvider
+    ↓
+BusinessWorkspaceRepository
+    ↓
+HttpBusinessWorkspaceRepository
+    ↓
+Deno API
+```
+
+The legacy dependency:
+
+```text
+workspaceResolutionProvider
+    ↓
+CallableBusinessWorkspaceRepository
+    ↓
+FirebaseFunctions.httpsCallable(...)
+```
+
+must not return.
+
+---
+
+# 20. Things NOT To Do for the Current Workspace Bug
+
+Do NOT:
+
+* rewrite the workspace resolver
+* modify `/api/workspaces`
+* change Firestore production data
+* weaken Firestore Rules
+* recreate the Business
+* migrate data again
+* add another Firebase Function
+* reintroduce `resolveMyBusinessWorkspaces`
+* modify providers simply because the installed APK calls the wrong repository
+* assume the production Deno endpoint is broken
+* treat temporary diagnostic logging as part of the fix
+
+The known problem is the stale installed artifact.
+
+---
+
+# 21. Current Known-Good State
+
+At the source/backend level:
+
+```text
+Deno /api/workspaces             ✅ healthy
+Current HTTP repository          ✅ present
+Current workspace provider path  ✅ migrated
+Production workspace response    ✅ valid
+Production Business              ✅ valid
+Targeted Flutter analysis        ✅ passed
+git diff --check                 ✅ passed
+Deno changes for this bug        ✅ none
+Production mutations             ✅ none
+```
+
+At the installed-device level:
+
+```text
+Installed APK                    ❌ stale
+Legacy callable embedded         ❌ yes
+Fresh rebuilt APK tested         ⏳ not yet
+Cold restart after fresh APK     ⏳ not yet
+```
+
+---
+
+# 22. Immediate Continuation Point
+
+If work resumes from this document, DO NOT begin another root-cause investigation.
+
+Start here:
+
+```text
+1. Build/install CURRENT Flutter source.
+2. Launch application.
+3. Verify GET /api/workspaces.
+4. Fully terminate application.
+5. Relaunch.
+6. Verify GET /api/workspaces again.
+7. Confirm active Business restoration.
+```
+
+Only if the FRESHLY BUILT APK still executes:
+
+```text
+resolveMyBusinessWorkspaces
+```
+
+should source/build dependency investigation resume.
+
+At that point inspect things such as:
+
+* repository provider wiring
+* build variants/flavors
+* stale generated artifacts
+* actual Git/worktree being built
+* Android package/application ID
+* device installation target
+* build cache
+
+But none of those should be investigated before first verifying behavior with a newly generated installed artifact.
+
+---
+
+# 23. Evidence-Based Final Diagnosis
+
+The current evidence supports the following diagnosis:
+
+```text
+Phase 1 source migration:
+SUCCESSFUL
+
+Production Deno workspace resolver:
+HEALTHY
+
+Current Flutter workspace source:
+CORRECT
+
+Installed Android APK:
+OUTDATED
+
+Reason restart fails:
+ANDROID RELAUNCHES OLD INSTALLED ARTIFACT
+
+Code changes required:
+NONE
+
+Required action:
+FRESH BUILD + INSTALL + COLD-RESTART VERIFICATION
+```
+
+---
+
+# 24. Handoff Instruction for a New Agent
+
+If this document is being given to another AI/agent:
+
+Do not re-diagnose the workspace failure from scratch.
+
+Accept the following as already verified unless new evidence contradicts it:
+
+```text
+The current source uses HttpBusinessWorkspaceRepository.
+The production Deno GET /api/workspaces endpoint works.
+The installed APK contains CallableBusinessWorkspaceRepository.
+The installed APK contains resolveMyBusinessWorkspaces.
+The installed APK does not represent the current source.
+```
+
+The first unresolved task is therefore:
+
+> Generate/install the current artifact when builds are permitted and verify workspace resolution survives complete process termination.
+
+Do not make speculative backend or database changes before that verification.
+
+---
+
+# 25. Recovery Summary
+
+If only one section of this document survives, preserve this:
+
+```text
+The Flutter Business workspace migration to Deno is already present in
+the current source.
+
+Expected path:
+
+HttpBusinessWorkspaceRepository
+→ GET /api/workspaces
+
+The production Deno endpoint has been verified healthy and returned one
+valid active Business.
+
+The restart failure came from the Android device launching an OLD
+installed APK.
+
+Inspection of that APK's kernel_blob.bin confirmed it still contains:
+
+resolveMyBusinessWorkspaces
+CallableBusinessWorkspaceRepository
+
+The successful earlier process contained the migration only because it
+had been hot-reloaded.
+
+After complete termination that process disappeared and Android launched
+the stale installed artifact again.
+
+No source, Deno, Firestore, or production-data changes are required for
+this bug.
+
+The next task is simply to build/install a fresh APK from current source
+when Flutter builds are permitted, then verify GET /api/workspaces both
+before and after a complete process restart.
+
+Do not restart the migration or modify the backend unless a freshly
+built APK reproduces the legacy callable behavior.
+```

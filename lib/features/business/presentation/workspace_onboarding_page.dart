@@ -24,7 +24,7 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose your workspace'),
+        title: const Text('Choose a Business'),
         actions: [
           IconButton(
             tooltip: 'Log out',
@@ -45,7 +45,7 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
               padding: const EdgeInsets.all(AppSpacing.xl),
               children: [
                 Text(
-                  'Workspace onboarding',
+                  'Business setup',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -89,8 +89,8 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
                           const Icon(Icons.cloud_off_outlined, size: 40),
                           const SizedBox(height: AppSpacing.md),
                           const Text(
-                            'Invitations could not be checked. Retry before '
-                            'creating a new Business.',
+                            'Invitations could not be checked. You can retry '
+                            'or create a new Business.',
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: AppSpacing.md),
@@ -112,12 +112,12 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
                             Icon(Icons.business_center_outlined, size: 44),
                             SizedBox(height: AppSpacing.md),
                             Text(
-                              "You're not part of a business yet.",
+                              "You're not part of a Business yet.",
                               textAlign: TextAlign.center,
                             ),
                             SizedBox(height: AppSpacing.sm),
                             Text(
-                              'Create a business to start managing your finances.',
+                              'Create a Business to start managing your finances.',
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -133,13 +133,13 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                     ],
-                    const SizedBox(height: AppSpacing.xl),
-                    FilledButton.icon(
-                      onPressed: busy ? null : () => _create(context, ref),
-                      icon: const Icon(Icons.add_business_rounded),
-                      label: const Text('Create a Business'),
-                    ),
                   ],
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                FilledButton.icon(
+                  onPressed: busy ? null : () => _create(context, ref),
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('Create a Business'),
                 ),
               ],
             ),
@@ -176,16 +176,14 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
   }
 
   Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final name = await showDialog<String>(
+    final created = await showDialog<bool>(
       context: context,
       builder: (_) => const CreateBusinessDialog(),
     );
-    if (name == null || !context.mounted) return;
-    final success = await ref
-        .read(workspaceMutationControllerProvider.notifier)
-        .create(name);
-    if (!success && context.mounted) {
-      _showFailure(context, 'The Business could not be created.');
+    if (created == true && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Business created')));
     }
   }
 

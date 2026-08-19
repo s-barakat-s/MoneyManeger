@@ -1,16 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/backend/authenticated_backend_client.dart';
 import '../../../core/data/data_scope.dart';
 import '../../../core/firebase/firebase_providers.dart';
 import '../../auth/application/auth_providers.dart';
-import '../data/callable_business_workspace_repository.dart';
+import '../data/http_business_workspace_repository.dart';
 import '../domain/business_workspace.dart';
 import '../domain/repositories/business_workspace_repository.dart';
 
 final businessWorkspaceRepositoryProvider =
     Provider<BusinessWorkspaceRepository>(
-      (ref) => CallableBusinessWorkspaceRepository(
-        functions: ref.watch(firebaseFunctionsProvider),
+      (ref) => HttpBusinessWorkspaceRepository(
+        backend: ref.watch(authenticatedBackendClientProvider),
       ),
     );
 
@@ -30,6 +31,14 @@ final activeBusinessIdProvider = Provider<String>((ref) {
     if (businessId != null) return businessId;
   }
   throw const MissingActiveBusinessException();
+});
+
+final currentWorkspaceProvider = Provider<BusinessWorkspace?>((ref) {
+  return ref.watch(workspaceResolutionProvider).value?.selectedWorkspace;
+});
+
+final isBusinessOwnerProvider = Provider<bool>((ref) {
+  return ref.watch(currentWorkspaceProvider)?.isOwner == true;
 });
 
 final workspaceMutationControllerProvider =

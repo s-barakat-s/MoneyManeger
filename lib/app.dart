@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -113,10 +112,13 @@ class MoneyManagerApp extends ConsumerStatefulWidget {
 
 class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
     with WidgetsBindingObserver {
+  bool _unauthenticatedEntryResetScheduled = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ref.listenManual(authStateProvider, _handleAuthStateChange);
   }
 
   @override
@@ -134,26 +136,31 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
     ref.invalidate(savedAccountsControllerProvider);
   }
 
+  void _handleAuthStateChange(
+    AsyncValue<User?>? previous,
+    AsyncValue<User?> next,
+  ) {
+    if (next.value == null || _unauthenticatedEntryResetScheduled) return;
+    _unauthenticatedEntryResetScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _unauthenticatedEntryResetScheduled = false;
+      if (!mounted || ref.read(authStateProvider).value == null) return;
+      ref
+          .read(unauthenticatedEntryControllerProvider.notifier)
+          .showSavedAccounts();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(savedAccountSynchronizationProvider);
     final authState = ref.watch(authStateProvider);
     final registrationInProgress = ref.watch(registrationInProgressProvider);
     final themeMode = ref.watch(themeModeProvider);
-    ref.listen(authStateProvider, (previous, next) {
-      if (next is AsyncData<User?> && next.value != null) {
-        ref
-            .read(unauthenticatedEntryControllerProvider.notifier)
-            .showSavedAccounts();
-      }
-    });
 
     return authState.when(
       data: (user) {
         if (user == null || registrationInProgress) {
-          if (kDebugMode) {
-            debugPrint('AuthGate destination=UnauthenticatedEntry');
-          }
           return _buildUnauthenticatedApp(
             ref,
             themeMode,
@@ -161,47 +168,9 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
           );
         }
 
-        final hasPasswordProvider = user.providerData.any(
-          (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
-        );
-        final hasGoogleProvider = user.providerData.any(
-          (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
-        );
-        final requiresEmailVerification =
-            hasPasswordProvider && !hasGoogleProvider && !user.emailVerified;
-        _debugAuthGateDecision(
-          user: user,
-          requiresEmailVerification: requiresEmailVerification,
-          destination: requiresEmailVerification
-              ? 'EmailVerification'
-              : 'ProfileCheck',
-        );
-        if (requiresEmailVerification) {
-          return MaterialApp(
-            scaffoldMessengerKey: rootScaffoldMessengerKey,
-            builder: _accountSwitchBuilder,
-            key: ValueKey('email-verification-${user.uid}'),
-            title: 'Money Manager',
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: themeMode,
-            debugShowCheckedModeBanner: false,
-            home: RootBackExitScope(
-              isTrueRoot: true,
-              resetToken: 'email-verification-${user.uid}',
-              child: EmailVerificationPage(user: user),
-            ),
-          );
-        }
-
         final profileStatus = ref.watch(userProfileStatusProvider(user.uid));
         return profileStatus.when(
           loading: () {
-            _debugAuthGateDecision(
-              user: user,
-              requiresEmailVerification: false,
-              destination: 'ProfileLoading',
-            );
             return MaterialApp(
               scaffoldMessengerKey: rootScaffoldMessengerKey,
               builder: _accountSwitchBuilder,
@@ -214,18 +183,13 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
               home: RootBackExitScope(
                 isTrueRoot: true,
                 resetToken: 'profile-loading-${user.uid}',
-                child: const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
+                child: const _StartupLoadingPage(
+                  label: 'Loading your Account...',
                 ),
               ),
             );
           },
           error: (error, stackTrace) {
-            _debugAuthGateDecision(
-              user: user,
-              requiresEmailVerification: false,
-              destination: 'ProfileError',
-            );
             return MaterialApp(
               scaffoldMessengerKey: rootScaffoldMessengerKey,
               builder: _accountSwitchBuilder,
@@ -244,11 +208,6 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
           },
           data: (profile) {
             if (!profile.isComplete) {
-              _debugAuthGateDecision(
-                user: user,
-                requiresEmailVerification: false,
-                destination: 'UsernameOnboarding',
-              );
               return MaterialApp(
                 scaffoldMessengerKey: rootScaffoldMessengerKey,
                 builder: _accountSwitchBuilder,
@@ -262,6 +221,25 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
                   isTrueRoot: true,
                   resetToken: 'username-onboarding-${user.uid}',
                   child: UsernameOnboardingPage(user: user),
+                ),
+              );
+            }
+
+            final requiresEmailVerification = !user.emailVerified;
+            if (requiresEmailVerification) {
+              return MaterialApp(
+                scaffoldMessengerKey: rootScaffoldMessengerKey,
+                builder: _accountSwitchBuilder,
+                key: ValueKey('email-verification-${user.uid}'),
+                title: 'Money Manager',
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: themeMode,
+                debugShowCheckedModeBanner: false,
+                home: RootBackExitScope(
+                  isTrueRoot: true,
+                  resetToken: 'email-verification-${user.uid}',
+                  child: EmailVerificationPage(user: user),
                 ),
               );
             }
@@ -285,11 +263,6 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
             }
             final resolution = workspaceResolution.requireValue;
             if (!resolution.hasSelectedBusiness) {
-              _debugAuthGateDecision(
-                user: user,
-                requiresEmailVerification: false,
-                destination: 'WorkspaceOnboarding',
-              );
               return _workspaceGateApp(
                 themeMode: themeMode,
                 uid: user.uid,
@@ -297,11 +270,6 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
               );
             }
 
-            _debugAuthGateDecision(
-              user: user,
-              requiresEmailVerification: false,
-              destination: 'Home',
-            );
             return MaterialApp.router(
               scaffoldMessengerKey: rootScaffoldMessengerKey,
               builder: _accountSwitchBuilder,
@@ -328,7 +296,7 @@ class _MoneyManagerAppState extends ConsumerState<MoneyManagerApp>
         home: const RootBackExitScope(
           isTrueRoot: true,
           resetToken: 'auth-loading',
-          child: Scaffold(body: Center(child: CircularProgressIndicator())),
+          child: _StartupLoadingPage(label: 'Restoring your session...'),
         ),
       ),
       error: (error, stackTrace) => MaterialApp(
@@ -384,7 +352,7 @@ class _WorkspaceResolutionLoadingPage extends StatelessWidget {
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Checking your workspaces...'),
+            Text('Checking your businesses...'),
           ],
         ),
       ),
@@ -409,7 +377,7 @@ class _WorkspaceResolutionErrorPage extends StatelessWidget {
               const Icon(Icons.business_center_outlined, size: 48),
               const SizedBox(height: 16),
               Text(
-                'Your workspaces could not be checked',
+                'Your businesses could not be checked',
                 style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
@@ -517,20 +485,41 @@ class _SavedAccountsLoadingPage extends StatelessWidget {
   }
 }
 
-void _debugAuthGateDecision({
-  required User user,
-  required bool requiresEmailVerification,
-  required String destination,
-}) {
-  if (!kDebugMode) return;
-  final providerIds = user.providerData
-      .map((provider) => provider.providerId)
-      .toList(growable: false);
-  debugPrint(
-    'AuthGate providers=$providerIds, emailVerified=${user.emailVerified}, '
-    'requiresEmailVerification=$requiresEmailVerification, '
-    'destination=$destination',
-  );
+class _StartupLoadingPage extends StatelessWidget {
+  const _StartupLoadingPage({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Semantics(
+            liveRegion: true,
+            label: label,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.account_balance_wallet_rounded, size: 52),
+                const SizedBox(height: 16),
+                Text(
+                  'Money Manager',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(label),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AuthRefreshErrorPage extends ConsumerWidget {

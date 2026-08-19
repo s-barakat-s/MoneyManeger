@@ -2,13 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/debt.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/debt_payment.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
+import '../../../business/application/business_access_providers.dart';
+import '../../../business/domain/permission.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
+import '../../../owners/presentation/widgets/add_owner_dialog.dart';
 import '../../application/debt_providers.dart';
 
 class RecordDebtPaymentDialog extends ConsumerStatefulWidget {
@@ -34,7 +38,7 @@ class _RecordDebtPaymentDialogState
   late final TextEditingController _amountController;
   final _noteController = TextEditingController();
   String? _ownerId;
-  bool _didInitializeOwner = false;
+  late final FinancialFormScopeGuard _scopeGuard;
   DateTime _date = DateTime.now();
   var _isSaving = false;
   String? _errorMessage;
@@ -42,6 +46,7 @@ class _RecordDebtPaymentDialogState
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
     _amountController = TextEditingController(
       text: widget.prefillAmount?.toStringAsFixed(2) ?? '',
     );
@@ -58,19 +63,25 @@ class _RecordDebtPaymentDialogState
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
-    return AlertDialog(
-      scrollable: true,
+    return AdaptiveFinancialFormDialog(
       title: Text(_dialogTitle),
+      canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
           if (owners.isEmpty) {
-            return ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Text(
-                _isCollection
-                    ? 'Add a money holder before recording a collection.'
-                    : 'Add a money holder before recording a debt payment.',
-              ),
+            final canCreateHolder =
+                ref.watch(canProvider(Permission.ownersCreate)).value == true;
+            return FinancialPrecondition(
+              message: _isCollection
+                  ? 'Add a money holder before recording a collection.'
+                  : 'Add a money holder before recording a debt payment.',
+              actionLabel: canCreateHolder ? 'Create money holder' : null,
+              onAction: canCreateHolder
+                  ? () => showDialog<bool>(
+                      context: context,
+                      builder: (context) => const AddOwnerDialog(),
+                    )
+                  : null,
             );
           }
 
@@ -82,6 +93,27 @@ class _RecordDebtPaymentDialogState
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  TextFormField(
+                    controller: _amountController,
+                    autofocus: true,
+                    decoration: amountInputDecoration(_amountLabel),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: decimalAmountInputFormatters,
+                    validator: (value) {
+                      final amount = double.tryParse(value?.trim() ?? '');
+                      if (amount == null || amount <= 0) {
+                        return 'Enter an amount greater than 0';
+                      }
+                      if (amount > widget.remainingAmount) {
+                        return 'Amount cannot exceed the remaining ${_isCollection ? 'receivable' : 'debt'}';
+                      }
+
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey(_ownerId),
                     initialValue: _ownerId,
@@ -99,25 +131,6 @@ class _RecordDebtPaymentDialogState
                     onChanged: (value) => setState(() => _ownerId = value),
                     validator: (value) =>
                         value == null ? 'Select a money holder' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _amountController,
-                    decoration: amountInputDecoration(_amountLabel),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    validator: (value) {
-                      final amount = double.tryParse(value?.trim() ?? '');
-                      if (amount == null || amount <= 0) {
-                        return 'Enter a valid amount';
-                      }
-                      if (amount > widget.remainingAmount) {
-                        return 'Amount cannot exceed remaining debt';
-                      }
-
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 12),
                   DialogDateField(
@@ -160,12 +173,16 @@ class _RecordDebtPaymentDialogState
           height: 96,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (error, stackTrace) => Text(error.toString()),
+        error: (error, stackTrace) => FinancialFormLoadError(
+          onRetry: () => ref.invalidate(ownersStreamProvider),
+        ),
       ),
       actions: [
         DialogFormActions(
           primaryLabel: _isCollection ? 'Record collection' : 'Record payment',
-          onPrimaryPressed: _isSaving ? null : _save,
+          onPrimaryPressed: _isSaving || ownersAsync.value?.isEmpty != false
+              ? null
+              : _save,
           onCancelPressed: _isSaving ? null : () => Navigator.of(context).pop(),
           isSaving: _isSaving,
         ),
@@ -175,6 +192,11 @@ class _RecordDebtPaymentDialogState
 
   Future<void> _save() async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
       return;
     }
 
@@ -198,12 +220,12 @@ class _RecordDebtPaymentDialogState
         ),
       );
 
-      await ref
-          .read(lastUsedSelectionProvider)
-          .save(_selectionPreference, _ownerId!);
-
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(
+          context,
+          _isCollection ? 'Collection recorded' : 'Payment recorded',
+        );
+        Navigator.of(context).pop(true);
       }
     } on FirebaseException catch (error) {
       if (mounted) {
@@ -226,29 +248,14 @@ class _RecordDebtPaymentDialogState
 
   bool get _isCollection => widget.debt.type == DebtType.owedToUs;
 
-  LastUsedOwnerSelection get _selectionPreference => _isCollection
-      ? LastUsedOwnerSelection.receivableCollection
-      : LastUsedOwnerSelection.debtPayment;
-
   void _initializeOwner(List<Owner> owners) {
-    if (_didInitializeOwner) {
-      return;
-    }
-    _didInitializeOwner = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final remembered = await ref
-          .read(lastUsedSelectionProvider)
-          .read(_selectionPreference);
-      if (!mounted || _ownerId != null) {
-        return;
-      }
-
-      final validRemembered = owners.any((owner) => owner.id == remembered);
-      setState(() {
-        _ownerId = validRemembered ? remembered : owners.first.id;
+    if (owners.length == 1 && _ownerId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _ownerId == null) {
+          setState(() => _ownerId = owners.single.id);
+        }
       });
-    });
+    }
   }
 
   String get _dialogTitle {
@@ -274,8 +281,7 @@ class _RecordDebtPaymentDialogState
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 
   String _friendlyFirestoreError(FirebaseException error) {

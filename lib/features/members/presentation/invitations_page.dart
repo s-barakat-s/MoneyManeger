@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/administrative_scope_guard.dart';
 import '../../../shared/widgets/app_shell.dart';
 import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -24,8 +25,9 @@ class InvitationsPage extends ConsumerWidget {
     final invitations = ref.watch(myInvitationOffersProvider);
     final mutation = ref.watch(invitationMutationControllerProvider);
     return AppShell(
-      title: 'Invitations',
+      title: 'Received Invitations',
       currentLocation: currentLocation,
+      secondaryParent: AppRoute.settings,
       showMobileAppBarTitle: false,
       child: RefreshIndicator(
         onRefresh: () async {
@@ -37,8 +39,8 @@ class InvitationsPage extends ConsumerWidget {
           padding: AppBottomNavSpacer.listPadding(context),
           children: [
             const PageHeader(
-              title: 'Business Invitations',
-              subtitle: 'Invitations sent to your verified account email.',
+              title: 'Invitations to your account',
+              subtitle: 'Business invitations sent to your verified email.',
             ),
             const SizedBox(height: AppSpacing.xl),
             invitations.when(
@@ -49,8 +51,7 @@ class InvitationsPage extends ConsumerWidget {
               loading: () => const LoadingSkeleton(itemCount: 3),
               error: (error, stackTrace) => const ErrorState(
                 title: 'Invitations unavailable',
-                message:
-                    'Verify your email and try loading invitations again.',
+                message: 'Verify your email and try loading invitations again.',
               ),
             ),
           ],
@@ -115,15 +116,29 @@ class _InvitationOffers extends ConsumerWidget {
     WidgetRef ref,
     InvitationOffer invitation,
   ) async {
+    final scope = AccountMutationScope.capture(ref);
+    if (!scope.isCurrent(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(administrativeContextChangedMessage)),
+      );
+      return;
+    }
     final success = await ref
         .read(invitationMutationControllerProvider.notifier)
         .accept(invitation);
     if (!context.mounted) return;
     if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invitation accepted')));
       context.go(AppRoute.dashboard.path);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invitation could not be accepted.')),
+        const SnackBar(
+          content: Text(
+            'This invitation is no longer pending or could not be accepted.',
+          ),
+        ),
       );
     }
   }

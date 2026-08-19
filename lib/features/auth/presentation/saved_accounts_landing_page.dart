@@ -229,7 +229,7 @@ class _LandingAccountTile extends StatelessWidget {
 
   String _providerLabel(SavedAccount account) {
     if (account.supportsGoogleSignIn && account.supportsPasswordSignIn) {
-      return 'Google / Email & Password';
+      return 'Google + Email & Password';
     }
     if (account.supportsGoogleSignIn) return 'Google';
     if (account.supportsPasswordSignIn) return 'Email & Password';

@@ -9,8 +9,10 @@ import '../../core/services/app_update_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../features/auth/application/auth_providers.dart';
 import '../../features/business/application/business_access_providers.dart';
 import '../../features/business/domain/permission.dart';
+import '../../features/business/presentation/workspace_switcher_card.dart';
 import '../navigation/root_back_exit.dart';
 import 'bottom_nav_spacer.dart';
 import 'responsive_dialog_content.dart';
@@ -22,6 +24,7 @@ class AppShell extends ConsumerStatefulWidget {
     required this.currentLocation,
     this.floatingActionButton,
     this.showMobileAppBarTitle = true,
+    this.secondaryParent,
     super.key,
   });
 
@@ -33,6 +36,7 @@ class AppShell extends ConsumerStatefulWidget {
   final String currentLocation;
   final Widget? floatingActionButton;
   final bool showMobileAppBarTitle;
+  final AppRoute? secondaryParent;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
@@ -138,13 +142,16 @@ class _AppShellState extends ConsumerState<AppShell> {
       widget.currentLocation,
       AppRoute.dashboard,
     );
+    final isSecondary = widget.secondaryParent != null;
+    final logicalBackRoute =
+        widget.secondaryParent ?? (isDashboard ? null : AppRoute.dashboard);
     return RootBackExitScope(
       canPopNormally: routerCanPop,
       isTrueRoot: isDashboard && !routerCanPop,
       resetToken: widget.currentLocation,
-      onLogicalBack: isDashboard
+      onLogicalBack: logicalBackRoute == null
           ? null
-          : () => context.go(AppRoute.dashboard.path),
+          : () => context.go(logicalBackRoute.path),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isDesktop = constraints.maxWidth >= AppShell._desktopBreakpoint;
@@ -162,6 +169,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     child: _MainContent(
                       title: widget.title,
                       padding: AppSpacing.xxl,
+                      onBack: isSecondary ? () => _navigateBack(context) : null,
                       child: widget.child,
                     ),
                   ),
@@ -172,36 +180,60 @@ class _AppShellState extends ConsumerState<AppShell> {
           }
 
           return Scaffold(
-            extendBody: true,
+            extendBody: !isSecondary,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            appBar: widget.showMobileAppBarTitle
+            appBar: isSecondary
+                ? AppBar(
+                    leading: BackButton(
+                      onPressed: () => _navigateBack(context),
+                    ),
+                    title: Text(widget.title),
+                  )
+                : widget.showMobileAppBarTitle
                 ? AppBar(title: Text(widget.title))
                 : null,
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: _MainContent(
+            body: isSecondary
+                ? _MainContent(
                     padding: AppSpacing.lg,
+                    contextHeader: const _PrimaryAppContext(),
                     child: widget.child,
+                  )
+                : Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _MainContent(
+                          padding: AppSpacing.lg,
+                          contextHeader: const _PrimaryAppContext(),
+                          child: widget.child,
+                        ),
+                      ),
+                      Positioned(
+                        left: AppSpacing.lg,
+                        right: AppSpacing.lg,
+                        bottom:
+                            MediaQuery.paddingOf(context).bottom +
+                            AppBottomNavSpacer.navigationBarBottomMargin,
+                        child: _MobileBottomNav(
+                          currentLocation: widget.currentLocation,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Positioned(
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
-                  bottom:
-                      MediaQuery.paddingOf(context).bottom +
-                      AppBottomNavSpacer.navigationBarBottomMargin,
-                  child: _MobileBottomNav(
-                    currentLocation: widget.currentLocation,
-                  ),
-                ),
-              ],
-            ),
             floatingActionButton: widget.floatingActionButton,
           );
         },
       ),
     );
+  }
+
+  void _navigateBack(BuildContext context) {
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+      return;
+    }
+    final parent = widget.secondaryParent;
+    if (parent != null) router.go(parent.path);
   }
 }
 
@@ -320,11 +352,19 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
 }
 
 class _MainContent extends StatelessWidget {
-  const _MainContent({required this.child, required this.padding, this.title});
+  const _MainContent({
+    required this.child,
+    required this.padding,
+    this.title,
+    this.contextHeader,
+    this.onBack,
+  });
 
   final Widget child;
   final double padding;
   final String? title;
+  final Widget? contextHeader;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -335,8 +375,25 @@ class _MainContent extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (title != null) ...[
-              Text(title!, style: Theme.of(context).textTheme.headlineLarge),
+              Row(
+                children: [
+                  if (onBack != null) ...[
+                    BackButton(onPressed: onBack),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title!,
+                      style: Theme.of(context).textTheme.headlineLarge,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.xxl),
+            ],
+            if (contextHeader != null) ...[
+              contextHeader!,
+              const SizedBox(height: AppSpacing.lg),
             ],
             Expanded(child: child),
           ],
@@ -357,6 +414,9 @@ class AppSidebar extends ConsumerWidget {
     final destinations = _destinations
         .where((destination) => _canUseDestination(ref, destination))
         .toList();
+    final quickAddActions = _quickAddActions
+        .where((action) => _can(ref, action.permission))
+        .toList();
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
@@ -369,7 +429,13 @@ class AppSidebar extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SidebarBrand(),
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.lg),
+              const _PrimaryAppContext(),
+              if (quickAddActions.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _DesktopQuickAddButton(actions: quickAddActions),
+              ],
+              const SizedBox(height: AppSpacing.xl),
               Expanded(
                 child: ListView.separated(
                   itemCount: destinations.length,
@@ -439,6 +505,37 @@ class _SidebarBrand extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PrimaryAppContext extends ConsumerWidget {
+  const _PrimaryAppContext();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).value;
+    final accountLabel = user?.email?.trim().isNotEmpty == true
+        ? user!.email!.trim()
+        : user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!.trim()
+        : 'Signed-in Account';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Text(
+            'Account: $accountLabel',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        const CurrentBusinessEntry(),
+      ],
     );
   }
 }
@@ -532,9 +629,7 @@ class _MobileBottomNav extends ConsumerWidget {
                 currentLocation: currentLocation,
               ),
             if (quickAddActions.isNotEmpty)
-              Expanded(
-                child: _CenterQuickAddButton(actions: quickAddActions),
-              ),
+              Expanded(child: _CenterQuickAddButton(actions: quickAddActions)),
             for (final destination in items.skip(splitIndex))
               _BottomNavItem(
                 destination: destination,
@@ -567,28 +662,35 @@ class _BottomNavItem extends StatelessWidget {
         : destination.icon;
 
     return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          onTap: () => context.go(destination.route.path),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: foreground, size: 24),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  destination.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: foreground,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: destination.label,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+            onTap: () => context.go(destination.route.path),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: foreground, size: 24),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    destination.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: foreground,
+                      fontWeight: isSelected
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -607,47 +709,30 @@ class _CenterQuickAddButton extends StatefulWidget {
 }
 
 class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
-  final LayerLink _layerLink = LayerLink();
-  bool _isPopoverOpen = false;
+  bool _isSheetOpen = false;
 
-  Future<void> _togglePopover() async {
-    if (_isPopoverOpen) {
-      _hidePopover();
-      return;
-    }
-
+  Future<void> _openQuickAdd() async {
+    if (_isSheetOpen) return;
     final router = GoRouter.of(context);
-    setState(() => _isPopoverOpen = true);
-    await showGeneralDialog<void>(
+    setState(() => _isSheetOpen = true);
+    final action = await showModalBottomSheet<_QuickAddAction>(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss Quick Add',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (dialogContext, animation, secondaryAnimation) =>
-          _QuickAddOverlay(
-            layerLink: _layerLink,
-            actions: widget.actions,
-            onDismiss: () => Navigator.of(dialogContext).pop(),
-            onActionSelected: (action) {
-              Navigator.of(dialogContext).pop();
-              _goQuickAdd(router, action);
-            },
-          ),
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _QuickAddSheet(actions: widget.actions),
     );
-    if (mounted) setState(() => _isPopoverOpen = false);
-  }
-
-  void _hidePopover() {
-    if (!_isPopoverOpen) return;
-    Navigator.of(context, rootNavigator: true).maybePop();
+    if (!mounted) return;
+    setState(() => _isSheetOpen = false);
+    if (action != null) _goQuickAdd(router, action);
   }
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Center(
+    return Center(
+      child: Semantics(
+        button: true,
+        label: 'Quick Add',
+        expanded: _isSheetOpen,
         child: DecoratedBox(
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
@@ -669,12 +754,12 @@ class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
-              onTap: _togglePopover,
+              onTap: _openQuickAdd,
               child: SizedBox(
                 width: 64,
                 height: 64,
                 child: AnimatedRotation(
-                  turns: _isPopoverOpen ? 0.125 : 0,
+                  turns: _isSheetOpen ? 0.125 : 0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
                   child: const Icon(
@@ -692,6 +777,85 @@ class _CenterQuickAddButtonState extends State<_CenterQuickAddButton> {
   }
 }
 
+class _QuickAddSheet extends StatelessWidget {
+  const _QuickAddSheet({required this.actions});
+
+  final List<_QuickAddAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.xl,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Quick Add', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.md),
+            for (final group in _QuickAddGroup.values)
+              if (actions.any((action) => action.group == group)) ...[
+                Text(
+                  group.label,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                for (final action in actions.where(
+                  (action) => action.group == group,
+                ))
+                  _QuickAddTile(
+                    action: action,
+                    onSelected: (selected) =>
+                        Navigator.of(context).pop(selected),
+                  ),
+                if (group != _QuickAddGroup.values.last)
+                  const SizedBox(height: AppSpacing.md),
+              ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopQuickAddButton extends StatelessWidget {
+  const _DesktopQuickAddButton({required this.actions});
+
+  final List<_QuickAddAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      menuChildren: [
+        for (final group in _QuickAddGroup.values)
+          if (actions.any((action) => action.group == group))
+            SubmenuButton(
+              menuChildren: [
+                for (final action in actions.where(
+                  (action) => action.group == group,
+                ))
+                  MenuItemButton(
+                    leadingIcon: Icon(action.icon),
+                    onPressed: () => _goQuickAdd(GoRouter.of(context), action),
+                    child: Text(action.title),
+                  ),
+              ],
+              child: Text(group.label),
+            ),
+      ],
+      builder: (context, controller, child) => OutlinedButton.icon(
+        onPressed: controller.isOpen ? controller.close : controller.open,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Quick Add'),
+      ),
+    );
+  }
+}
+
 void _goQuickAdd(GoRouter router, _QuickAddAction action) {
   final trigger = DateTime.now().microsecondsSinceEpoch.toString();
   final location = Uri(
@@ -699,135 +863,7 @@ void _goQuickAdd(GoRouter router, _QuickAddAction action) {
     queryParameters: {'quickAdd': action.quickAdd, 'trigger': trigger},
   ).toString();
 
-  router.go(location);
-}
-
-class _QuickAddOverlay extends StatelessWidget {
-  const _QuickAddOverlay({
-    required this.layerLink,
-    required this.actions,
-    required this.onDismiss,
-    required this.onActionSelected,
-  });
-
-  final LayerLink layerLink;
-  final List<_QuickAddAction> actions;
-  final VoidCallback onDismiss;
-  final ValueChanged<_QuickAddAction> onActionSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: onDismiss,
-            ),
-          ),
-          CompositedTransformFollower(
-            link: layerLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.topCenter,
-            followerAnchor: Alignment.bottomCenter,
-            offset: const Offset(0, -12),
-            child: _QuickAddPopover(
-              actions: actions,
-              onActionSelected: onActionSelected,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickAddPopover extends StatelessWidget {
-  const _QuickAddPopover({
-    required this.actions,
-    required this.onActionSelected,
-  });
-
-  final List<_QuickAddAction> actions;
-  final ValueChanged<_QuickAddAction> onActionSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.sizeOf(context);
-    final screenWidth = screenSize.width;
-    final popoverWidth = screenWidth < 360 ? screenWidth - 40 : 320.0;
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 10 * (1 - value)),
-            child: Transform.scale(
-              scale: 0.96 + (0.04 * value),
-              alignment: Alignment.bottomCenter,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: SizedBox(
-        width: popoverWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: screenSize.height * 0.62),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: AppRadius.borderXxl,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x2E1D1B2A),
-                      blurRadius: 30,
-                      offset: Offset(0, 16),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.md,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (
-                          var index = 0;
-                          index < actions.length;
-                          index++
-                        ) ...[
-                          _QuickAddTile(
-                            action: actions[index],
-                            onSelected: onActionSelected,
-                          ),
-                          if (index < actions.length - 1)
-                            const Divider(height: AppSpacing.lg),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const _PopoverPointer(),
-          ],
-        ),
-      ),
-    );
-  }
+  router.push(location);
 }
 
 class _QuickAddTile extends StatelessWidget {
@@ -892,45 +928,6 @@ class _QuickAddTile extends StatelessWidget {
   }
 }
 
-class _PopoverPointer extends StatelessWidget {
-  const _PopoverPointer();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipPath(
-      clipper: _PopoverPointerClipper(),
-      child: Container(
-        width: 28,
-        height: 14,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1A1D1B2A),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PopoverPointerClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    return Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
 class _QuickAddAction {
   const _QuickAddAction({
     required this.title,
@@ -940,6 +937,7 @@ class _QuickAddAction {
     required this.route,
     required this.quickAdd,
     required this.permission,
+    required this.group,
   });
 
   final String title;
@@ -949,6 +947,17 @@ class _QuickAddAction {
   final AppRoute route;
   final String quickAdd;
   final Permission permission;
+  final _QuickAddGroup group;
+}
+
+enum _QuickAddGroup {
+  money('Money'),
+  record('Record'),
+  setup('Setup');
+
+  const _QuickAddGroup(this.label);
+
+  final String label;
 }
 
 const _quickAddActions = [
@@ -960,6 +969,7 @@ const _quickAddActions = [
     route: AppRoute.transactions,
     quickAdd: 'income',
     permission: Permission.transactionsCreate,
+    group: _QuickAddGroup.money,
   ),
   _QuickAddAction(
     title: 'Add Expense',
@@ -969,6 +979,7 @@ const _quickAddActions = [
     route: AppRoute.transactions,
     quickAdd: 'expense',
     permission: Permission.transactionsCreate,
+    group: _QuickAddGroup.money,
   ),
   _QuickAddAction(
     title: 'Transfer Money',
@@ -978,6 +989,7 @@ const _quickAddActions = [
     route: AppRoute.transfers,
     quickAdd: 'transfer',
     permission: Permission.transfersCreate,
+    group: _QuickAddGroup.money,
   ),
   _QuickAddAction(
     title: 'Add Debt',
@@ -987,6 +999,7 @@ const _quickAddActions = [
     route: AppRoute.debts,
     quickAdd: 'debt',
     permission: Permission.debtsCreate,
+    group: _QuickAddGroup.record,
   ),
   _QuickAddAction(
     title: 'Add Receivable',
@@ -996,6 +1009,7 @@ const _quickAddActions = [
     route: AppRoute.receivables,
     quickAdd: 'receivable',
     permission: Permission.receivablesCreate,
+    group: _QuickAddGroup.record,
   ),
   _QuickAddAction(
     title: 'Add Money Holder',
@@ -1005,6 +1019,7 @@ const _quickAddActions = [
     route: AppRoute.owners,
     quickAdd: 'owner',
     permission: Permission.ownersCreate,
+    group: _QuickAddGroup.setup,
   ),
 ];
 
@@ -1053,7 +1068,7 @@ const _destinations = [
     permission: Permission.receivablesRead,
   ),
   _AppDestination(
-    'Company Assets',
+    'Assets',
     Icons.business_center_rounded,
     AppRoute.companyAssets,
     permission: Permission.assetsRead,
@@ -1077,7 +1092,7 @@ const _destinations = [
     permission: Permission.activityRead,
   ),
   _AppDestination(
-    'Invitations',
+    'Received Invitations',
     Icons.mark_email_unread_outlined,
     AppRoute.invitations,
   ),

@@ -415,8 +415,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _message = null;
     });
     final registrationFlow = ref.read(registrationInProgressProvider.notifier);
-    final verificationEmail = ref.read(verificationEmailStateProvider.notifier);
-    verificationEmail.reset();
+    ref.read(verificationEmailStateProvider.notifier).reset();
     registrationFlow.begin();
     try {
       final authService = ref.read(authServiceProvider);
@@ -426,24 +425,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
       final user = credential.user;
       if (user == null) throw const NoAuthenticatedUserException();
-      try {
-        await authService.sendCurrentUserEmailVerification();
-        verificationEmail.markSent(user.uid);
-      } catch (error) {
-        verificationEmail.markFailed(user.uid);
-        if (kDebugMode) {
-          if (error is FirebaseAuthException) {
-            debugPrint(
-              'Initial verification email failed: ${error.runtimeType}, '
-              'code=${error.code}, message=${error.message}',
-            );
-          } else {
-            debugPrint(
-              'Initial verification email failed: ${error.runtimeType}.',
-            );
-          }
-        }
-      }
     } on FirebaseAuthException catch (error) {
       if (error.code == 'email-already-in-use' && mounted) {
         final action = await showDialog<_RecoveryAction>(
@@ -906,6 +887,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       final refreshedUser = await authService.reloadCurrentUser();
       if (!mounted) return;
       if (refreshedUser.emailVerified) {
+        ref.invalidate(authStateProvider);
         return;
       }
       setState(() => _message = 'Your email is not verified yet.');
@@ -1043,7 +1025,7 @@ class _UsernameOnboardingPageState
 
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.user.displayName?.trim();
+    final displayName = widget. user.displayName?.trim();
     return _AuthScaffold(
       cardTitle: displayName == null || displayName.isEmpty
           ? 'Welcome!'
@@ -1111,6 +1093,8 @@ class _UsernameOnboardingPageState
     if (!_formKey.currentState!.validate()) return;
 
     final authService = ref.read(authServiceProvider);
+    final verificationEmail = ref.read(verificationEmailStateProvider.notifier);
+    final expectedUid = widget.user.uid;
     setState(() {
       _isSubmitting = true;
       _message = null;
@@ -1125,6 +1109,21 @@ class _UsernameOnboardingPageState
         user: widget.user,
         username: _usernameController.text,
       );
+      final currentUser = authService.currentUser;
+      final usesPassword = currentUser?.providerData.any(
+        (provider) => provider.providerId == EmailAuthProvider.PROVIDER_ID,
+      );
+      if (currentUser?.uid == expectedUid &&
+          currentUser!.emailVerified == false &&
+          usesPassword == true) {
+        try {
+          await authService.sendCurrentUserEmailVerification();
+          verificationEmail.markSent(expectedUid);
+        } on FirebaseAuthException catch (error) {
+          verificationEmail.markFailed(expectedUid);
+          _debugProfileVerificationError(error);
+        }
+      }
       // The live profile stream refreshes AuthGate without touching ref after
       // this widget may already have been disposed.
     } on UsernameAlreadyTakenException {
@@ -1154,6 +1153,14 @@ class _UsernameOnboardingPageState
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _debugProfileVerificationError(FirebaseAuthException error) {
+    if (!kDebugMode) return;
+    debugPrint(
+      'Profile verification email failed: ${error.runtimeType}, '
+      'code=${error.code}, message=${error.message}',
+    );
   }
 
   Future<void> _logout() async {

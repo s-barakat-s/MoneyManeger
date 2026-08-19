@@ -11,12 +11,14 @@ void main() {
           businessName: 'Business A',
           roleId: 'owner',
           roleName: 'Owner',
+          isOwner: true,
         ),
         BusinessWorkspace(
           businessId: 'business-b',
           businessName: 'Business B',
           roleId: 'accountant',
           roleName: 'Accountant',
+          isOwner: false,
         ),
       ],
     );

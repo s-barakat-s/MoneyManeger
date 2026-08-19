@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/owner.dart';
 import '../../../shared/models/transaction.dart' as money;
 import '../../../shared/widgets/amount_text.dart';
@@ -71,6 +74,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final actorNamesAsync = ref.watch(transactionActorNamesProvider);
     final ownersAsync = ref.watch(ownersStreamProvider);
     final canCreate =
         ref.watch(canProvider(Permission.transactionsCreate)).value == true;
@@ -109,8 +113,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                   selectedType: _selectedType,
                   selectedOwnerId: _selectedOwnerId,
                   onClearFilters: _clearAllFilters,
+                  onAdd: canCreate ? () => _showAddDialog(context) : null,
                   canUpdate: canUpdate,
                   canArchive: canArchive,
+                  actorNames: actorNamesAsync.value ?? const {},
+                  actorNamesLoading: actorNamesAsync.isLoading,
                 ),
                 loading: () => const LoadingSkeleton(itemCount: 5),
                 error: (error, stackTrace) => const ErrorState(
@@ -198,23 +205,29 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     }
 
     _handledQuickAddTrigger = trigger;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
         return;
       }
 
-      if (ref.read(canProvider(Permission.transactionsCreate)).value ==
-          true) {
-        _showAddDialog(context, initialType: initialType);
+      if (ref.read(canProvider(Permission.transactionsCreate)).value == true) {
+        final saved = await _showAddDialog(context, initialType: initialType);
+        if (!mounted) return;
+        completeQuickAddNavigation(
+          context,
+          saved: saved == true,
+          destination: AppRoute.transactions,
+          cancelFallback: AppRoute.transactions,
+        );
       }
     });
   }
 
-  Future<void> _showAddDialog(
+  Future<bool?> _showAddDialog(
     BuildContext context, {
     money.TransactionType initialType = money.TransactionType.expense,
   }) {
-    return showDialog<void>(
+    return showDialog<bool>(
       context: context,
       builder: (context) => AddTransactionDialog(initialType: initialType),
     );
@@ -323,8 +336,11 @@ class _TransactionsList extends StatelessWidget {
     required this.selectedType,
     required this.selectedOwnerId,
     required this.onClearFilters,
+    required this.onAdd,
     required this.canUpdate,
     required this.canArchive,
+    required this.actorNames,
+    required this.actorNamesLoading,
   });
 
   final List<money.Transaction> transactions;
@@ -333,8 +349,11 @@ class _TransactionsList extends StatelessWidget {
   final money.TransactionType? selectedType;
   final String? selectedOwnerId;
   final VoidCallback onClearFilters;
+  final VoidCallback? onAdd;
   final bool canUpdate;
   final bool canArchive;
+  final Map<String, String> actorNames;
+  final bool actorNamesLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -365,10 +384,17 @@ class _TransactionsList extends StatelessWidget {
     }).toList();
 
     if (transactions.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.receipt_long_rounded,
-        title: 'No transactions yet.',
-        description: 'Income and expenses will appear here after you add them.',
+        title: 'No transactions yet',
+        description: 'Income and expenses will appear here.',
+        action: onAdd == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add transaction'),
+              ),
       );
     }
 
@@ -401,9 +427,15 @@ class _TransactionsList extends StatelessWidget {
         final title = note == null || note.isEmpty
             ? _labelForType(transaction.type)
             : note;
+        final creatorUid = transaction.audit.createdBy;
+        final creatorName = creatorUid == null
+            ? 'Unknown member'
+            : actorNames[creatorUid] ??
+                  (actorNamesLoading ? 'Loading creator...' : 'Unknown member');
 
         return AppCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
+          onTap: () => context.push(transactionDetailsLocation(transaction.id)),
           child: Row(
             children: [
               _LedgerIcon(icon: _iconForType(transaction.type), color: color),
@@ -425,6 +457,15 @@ class _TransactionsList extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Created by $creatorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -441,15 +482,15 @@ class _TransactionsList extends StatelessWidget {
                   ),
                   if (canUpdate || canArchive)
                     PopupMenuButton<_TransactionAction>(
-                    tooltip: 'More actions',
-                    icon: const Icon(Icons.more_horiz_rounded),
-                    onSelected: (action) {
-                      if (action == _TransactionAction.edit) {
-                        _showEditDialog(context, transaction);
-                      } else {
-                        _showDeleteDialog(context, transaction);
-                      }
-                    },
+                      tooltip: 'More actions',
+                      icon: const Icon(Icons.more_horiz_rounded),
+                      onSelected: (action) {
+                        if (action == _TransactionAction.edit) {
+                          _showEditDialog(context, transaction);
+                        } else {
+                          _showDeleteDialog(context, transaction);
+                        }
+                      },
                       itemBuilder: (context) => [
                         if (canUpdate)
                           const PopupMenuItem(
@@ -507,8 +548,7 @@ class _TransactionsList extends StatelessWidget {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }
 

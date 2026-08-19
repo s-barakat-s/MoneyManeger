@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/owner.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/owner_providers.dart';
@@ -20,10 +21,12 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
   late final TextEditingController _nameController;
   var _isSaving = false;
   String? _errorMessage;
+  late final FinancialFormScopeGuard _scopeGuard;
 
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
     _nameController = TextEditingController(text: widget.owner.name);
   }
 
@@ -87,6 +90,11 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
       return;
     }
 
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _errorMessage = null;
@@ -98,12 +106,14 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(context, 'Money holder updated');
+        Navigator.of(context).pop(true);
       }
     } catch (_) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Could not save owner. Please try again.',
+          () => _errorMessage =
+              'Could not update the money holder. Check your permission and connection, then try again.',
         );
       }
     } finally {

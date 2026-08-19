@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/company_asset.dart';
 import '../../../shared/widgets/amount_text.dart';
 import '../../../shared/widgets/app_card.dart';
@@ -62,22 +64,23 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
     final canArchive =
         ref.watch(canProvider(Permission.assetsArchive)).value == true;
 
-    return HomeSummaryHero(
-      tag: HomeSummaryHeroTags.assets,
-      child: AppShell(
-        title: 'Company Assets',
-        currentLocation: widget.currentLocation,
-        showMobileAppBarTitle: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PageHeader(
-              title: 'Assets',
-              actionLabel: canCreate ? 'Add asset' : null,
-              onAction: canCreate ? () => _showAddDialog(context) : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            totalAsync.when(
+    return AppShell(
+      title: 'Assets',
+      currentLocation: widget.currentLocation,
+      secondaryParent: AppRoute.dashboard,
+      showMobileAppBarTitle: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PageHeader(
+            title: 'Assets',
+            actionLabel: canCreate ? 'Add asset' : null,
+            onAction: canCreate ? () => _showAddDialog(context) : null,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          HomeSummaryHero(
+            tag: HomeSummaryHeroTags.assets,
+            child: totalAsync.when(
               data: (total) => _SummaryCard(value: formatEgpCurrency(total)),
               loading: () => const LinearProgressIndicator(),
               error: (error, stackTrace) => const ErrorState(
@@ -85,34 +88,34 @@ class _CompanyAssetsPageState extends ConsumerState<CompanyAssetsPage> {
                 message: 'We could not load your assets summary right now.',
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            AppSearchFilterBar(
-              controller: _searchController,
-              hintText: 'Search assets',
-              filtersActive: _hasPanelFilters,
-              onFilterTap: _showFilterSheet,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: assetsAsync.when(
-                data: (assets) => _AssetsList(
-                  assets: assets,
-                  searchText: _searchText,
-                  selectedCategory: _selectedCategory,
-                  onClearFilters: _clearAllFilters,
-                  onAdd: canCreate ? () => _showAddDialog(context) : null,
-                  canUpdate: canUpdate,
-                  canArchive: canArchive,
-                ),
-                loading: () => const LoadingSkeleton(itemCount: 4),
-                error: (error, stackTrace) => const ErrorState(
-                  title: 'Assets unavailable',
-                  message: 'We could not load company assets right now.',
-                ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AppSearchFilterBar(
+            controller: _searchController,
+            hintText: 'Search assets',
+            filtersActive: _hasPanelFilters,
+            onFilterTap: _showFilterSheet,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Expanded(
+            child: assetsAsync.when(
+              data: (assets) => _AssetsList(
+                assets: assets,
+                searchText: _searchText,
+                selectedCategory: _selectedCategory,
+                onClearFilters: _clearAllFilters,
+                onAdd: canCreate ? () => _showAddDialog(context) : null,
+                canUpdate: canUpdate,
+                canArchive: canArchive,
+              ),
+              loading: () => const LoadingSkeleton(itemCount: 4),
+              error: (error, stackTrace) => const ErrorState(
+                title: 'Assets unavailable',
+                message: 'We could not load business assets right now.',
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -192,7 +195,7 @@ class _SummaryCard extends StatelessWidget {
                 AmountText(amountText: value),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Company assets value',
+                  'Business assets value',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -251,7 +254,7 @@ class _AssetsList extends StatelessWidget {
         icon: Icons.inventory_2_rounded,
         title: 'No assets yet',
         description:
-            'Company assets like equipment, devices, inventory, or furniture will appear here once added.',
+            'Business assets like equipment, devices, inventory, or furniture will appear here once added.',
         action: onAdd == null
             ? null
             : FilledButton.icon(
@@ -282,12 +285,11 @@ class _AssetsList extends StatelessWidget {
       itemCount: visibleAssets.length,
       separatorBuilder: (context, index) =>
           const SizedBox(height: AppSpacing.md),
-      itemBuilder: (context, index) =>
-          _AssetListItem(
-            asset: visibleAssets[index],
-            canUpdate: canUpdate,
-            canArchive: canArchive,
-          ),
+      itemBuilder: (context, index) => _AssetListItem(
+        asset: visibleAssets[index],
+        canUpdate: canUpdate,
+        canArchive: canArchive,
+      ),
     );
   }
 }
@@ -456,8 +458,7 @@ class _AssetListItem extends StatelessWidget {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }
 
@@ -488,10 +489,7 @@ class _AssetMenu extends StatelessWidget {
       },
       itemBuilder: (context) => [
         if (canUpdate)
-          const PopupMenuItem(
-            value: _AssetAction.edit,
-            child: Text('Edit'),
-          ),
+          const PopupMenuItem(value: _AssetAction.edit, child: Text('Edit')),
         if (canArchive)
           const PopupMenuItem(
             value: _AssetAction.archive,

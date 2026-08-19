@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/backend/authenticated_backend_client.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/administrative_scope_guard.dart';
 import '../../../shared/widgets/app_shell.dart';
 import '../../../shared/widgets/bottom_nav_spacer.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/page_header.dart';
-import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_providers.dart';
 import '../../business/domain/business_member.dart';
-import '../../business/domain/permission.dart';
 import '../application/team_management_providers.dart';
 import '../domain/assignable_role.dart';
 import '../domain/business_invitation.dart';
@@ -28,7 +30,7 @@ class MembersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final members = ref.watch(businessMembersProvider);
-    final canManage = ref.watch(canProvider(Permission.membersManage)).value == true;
+    final canManage = ref.watch(isBusinessOwnerProvider);
     final roles = canManage
         ? ref.watch(assignableRolesProvider)
         : const AsyncValue<List<AssignableRole>>.data([]);
@@ -39,6 +41,7 @@ class MembersPage extends ConsumerWidget {
     return AppShell(
       title: 'Business Members',
       currentLocation: currentLocation,
+      secondaryParent: AppRoute.settings,
       showMobileAppBarTitle: false,
       child: RefreshIndicator(
         onRefresh: () async {
@@ -61,9 +64,8 @@ class MembersPage extends ConsumerWidget {
               onAction: canManage && roles.hasValue && roles.value!.isNotEmpty
                   ? () => showDialog<void>(
                       context: context,
-                      builder: (context) => InviteMemberDialog(
-                        roles: roles.value!,
-                      ),
+                      builder: (context) =>
+                          InviteMemberDialog(roles: roles.value!),
                     )
                   : null,
             ),
@@ -88,7 +90,10 @@ class MembersPage extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               invitations.when(
-                data: (values) => _InvitationList(invitations: values),
+                data: (values) => _InvitationList(
+                  invitations: values,
+                  roles: roles.value ?? const [],
+                ),
                 loading: () => const LoadingSkeleton(itemCount: 2),
                 error: (error, stackTrace) => const ErrorState(
                   title: 'Invitations unavailable',
@@ -123,21 +128,86 @@ class _MemberList extends StatelessWidget {
         description: 'Business memberships will appear here.',
       );
     }
-    final sorted = [...members]..sort((left, right) {
-      if (left.isProtectedOwner != right.isProtectedOwner) {
-        return left.isProtectedOwner ? -1 : 1;
-      }
-      return left.primaryLabel.compareTo(right.primaryLabel);
-    });
+    final sorted = [...members]
+      ..sort((left, right) {
+        if (left.isProtectedOwner != right.isProtectedOwner) {
+          return left.isProtectedOwner ? -1 : 1;
+        }
+        return left.primaryLabel.compareTo(right.primaryLabel);
+      });
+    final active = sorted
+        .where(
+          (member) =>
+              member.status == MembershipStatus.active ||
+              member.status == MembershipStatus.invited,
+        )
+        .toList(growable: false);
+    final suspended = sorted
+        .where((member) => member.status == MembershipStatus.suspended)
+        .toList(growable: false);
+    final removed = sorted
+        .where((member) => member.status == MembershipStatus.removed)
+        .toList(growable: false);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var index = 0; index < sorted.length; index++) ...[
-          _MemberCard(
-            member: sorted[index],
+        if (active.isNotEmpty)
+          _MemberGroup(
+            title: 'Active team',
+            members: active,
             canManage: canManage,
             roles: roles,
           ),
-          if (index < sorted.length - 1)
+        if (active.isNotEmpty && suspended.isNotEmpty)
+          const SizedBox(height: AppSpacing.xl),
+        if (suspended.isNotEmpty)
+          _MemberGroup(
+            title: 'Suspended',
+            members: suspended,
+            canManage: canManage,
+            roles: roles,
+          ),
+        if ((active.isNotEmpty || suspended.isNotEmpty) && removed.isNotEmpty)
+          const SizedBox(height: AppSpacing.xl),
+        if (removed.isNotEmpty)
+          _MemberGroup(
+            title: 'Former members',
+            members: removed,
+            canManage: false,
+            roles: roles,
+          ),
+      ],
+    );
+  }
+}
+
+class _MemberGroup extends StatelessWidget {
+  const _MemberGroup({
+    required this.title,
+    required this.members,
+    required this.canManage,
+    required this.roles,
+  });
+
+  final String title;
+  final List<MemberSummary> members;
+  final bool canManage;
+  final List<AssignableRole> roles;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.md),
+        for (var index = 0; index < members.length; index++) ...[
+          _MemberCard(
+            member: members[index],
+            canManage: canManage,
+            roles: roles,
+          ),
+          if (index < members.length - 1)
             const SizedBox(height: AppSpacing.md),
         ],
       ],
@@ -158,7 +228,8 @@ class _MemberCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canAct = canManage && !member.isProtectedOwner;
+    final mutationBusy = ref.watch(memberMutationControllerProvider).isLoading;
+    final canAct = canManage && !member.isProtectedOwner && !mutationBusy;
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
@@ -183,6 +254,11 @@ class _MemberCard extends ConsumerWidget {
                     if (member.isProtectedOwner) ...[
                       const SizedBox(width: AppSpacing.sm),
                       const Icon(Icons.verified_rounded, size: 18),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        'Owner',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
                     ],
                   ],
                 ),
@@ -237,11 +313,16 @@ class _MemberCard extends ConsumerWidget {
     WidgetRef ref,
     _MemberAction action,
   ) async {
+    final scope = BusinessAdminMutationScope.capture(ref);
     if (action == _MemberAction.changeRole) {
       await showDialog<void>(
         context: context,
         builder: (context) => MemberRoleDialog(member: member, roles: roles),
       );
+      return;
+    }
+    if (action == _MemberAction.reactivate) {
+      await _runMutation(context, ref, action, scope);
       return;
     }
     final label = switch (action) {
@@ -254,7 +335,11 @@ class _MemberCard extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('$label member?'),
-        content: Text('$label ${member.primaryLabel}?'),
+        content: Text(
+          action == _MemberAction.suspend
+              ? '${member.primaryLabel} will temporarily lose active Business access. Historical records and Activity attribution will remain.'
+              : '${member.primaryLabel} will lose access to this Business. Historical financial and Activity attribution will remain, and their personal Account will not be deleted.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -267,29 +352,69 @@ class _MemberCard extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
+    await _runMutation(context, ref, action, scope);
+  }
+
+  Future<void> _runMutation(
+    BuildContext context,
+    WidgetRef ref,
+    _MemberAction action,
+    BusinessAdminMutationScope scope,
+  ) async {
+    if (!scope.isCurrent(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(administrativeContextChangedMessage)),
+      );
+      return;
+    }
     final controller = ref.read(memberMutationControllerProvider.notifier);
     final success = switch (action) {
-      _MemberAction.suspend => await controller.suspend(member.uid),
-      _MemberAction.reactivate => await controller.reactivate(member.uid),
-      _MemberAction.remove => await controller.remove(member.uid),
+      _MemberAction.suspend => await controller.suspend(
+        businessId: scope.businessId,
+        targetUid: member.uid,
+      ),
+      _MemberAction.reactivate => await controller.reactivate(
+        businessId: scope.businessId,
+        targetUid: member.uid,
+      ),
+      _MemberAction.remove => await controller.remove(
+        businessId: scope.businessId,
+        targetUid: member.uid,
+      ),
       _MemberAction.changeRole => false,
     };
-    if (!success && context.mounted) {
+    if (!context.mounted) return;
+    if (success) {
+      final message = switch (action) {
+        _MemberAction.suspend => 'Member suspended',
+        _MemberAction.reactivate => 'Member reactivated',
+        _MemberAction.remove => 'Member removed',
+        _MemberAction.changeRole => 'Role updated',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } else {
+      final error = ref.read(memberMutationControllerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The member could not be updated.')),
+        SnackBar(content: Text(_memberMutationError(error))),
       );
     }
   }
 }
 
 class _InvitationList extends ConsumerWidget {
-  const _InvitationList({required this.invitations});
+  const _InvitationList({required this.invitations, required this.roles});
 
   final List<BusinessInvitation> invitations;
+  final List<AssignableRole> roles;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final mutationBusy = ref
+        .watch(invitationMutationControllerProvider)
+        .isLoading;
     if (invitations.isEmpty) {
       return const EmptyState(
         icon: Icons.mark_email_read_outlined,
@@ -297,6 +422,7 @@ class _InvitationList extends ConsumerWidget {
         description: 'New invitations will appear here until accepted.',
       );
     }
+    final roleNames = {for (final role in roles) role.id: role.name};
     return Column(
       children: [
         for (var index = 0; index < invitations.length; index++) ...[
@@ -306,10 +432,14 @@ class _InvitationList extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.mail_outline_rounded),
               title: Text(invitations[index].email),
-              subtitle: Text('Role: ${invitations[index].roleId}'),
+              subtitle: Text(
+                'Role: ${roleNames[invitations[index].roleId] ?? 'Assigned role'} · Pending',
+              ),
               trailing: IconButton(
                 tooltip: 'Revoke invitation',
-                onPressed: () => _revoke(context, ref, invitations[index]),
+                onPressed: mutationBusy
+                    ? null
+                    : () => _revoke(context, ref, invitations[index]),
                 icon: const Icon(Icons.cancel_outlined),
               ),
             ),
@@ -326,12 +456,48 @@ class _InvitationList extends ConsumerWidget {
     WidgetRef ref,
     BusinessInvitation invitation,
   ) async {
+    final scope = BusinessAdminMutationScope.capture(ref);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Revoke invitation?'),
+        content: Text(
+          '${invitation.email} will no longer be able to accept this invitation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Revoke invitation'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    if (!scope.isCurrent(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(administrativeContextChangedMessage)),
+      );
+      return;
+    }
     final success = await ref
         .read(invitationMutationControllerProvider.notifier)
-        .revoke(invitation.id);
-    if (!success && context.mounted) {
+        .revoke(
+          businessId: scope.businessId,
+          invitationId: invitation.id,
+        );
+    if (!context.mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invitation revoked')));
+    } else {
+      final error = ref.read(invitationMutationControllerProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invitation could not be revoked.')),
+        SnackBar(content: Text(_revokeInvitationError(error))),
       );
     }
   }
@@ -359,3 +525,31 @@ class _StatusChip extends StatelessWidget {
 }
 
 enum _MemberAction { changeRole, suspend, reactivate, remove }
+
+String _memberMutationError(Object? error) {
+  if (error case BackendApiException(:final code)) {
+    return switch (code) {
+      'permission-denied' =>
+        'Only the Business Owner can manage team access.',
+      'failed-precondition' || 'not-found' =>
+        'This member can no longer be managed in their current state.',
+      'unauthenticated' => 'Sign in again before managing team access.',
+      _ => 'Could not update the member. Check your connection and try again.',
+    };
+  }
+  return 'Could not update the member. Check your connection and try again.';
+}
+
+String _revokeInvitationError(Object? error) {
+  if (error case BackendApiException(:final code)) {
+    return switch (code) {
+      'failed-precondition' => 'This invitation is no longer pending.',
+      'permission-denied' =>
+        'Only the Business Owner can revoke invitations.',
+      'unauthenticated' => 'Sign in again before revoking this invitation.',
+      _ =>
+        'Could not revoke the invitation. Check your connection and try again.',
+    };
+  }
+  return 'Could not revoke the invitation. Check your connection and try again.';
+}

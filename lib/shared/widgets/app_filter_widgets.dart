@@ -75,32 +75,40 @@ class AppFilterIconButton extends StatelessWidget {
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.onSurfaceVariant;
 
-    return Material(
-      color: background,
-      borderRadius: AppRadius.borderLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.borderLg,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Icon(Icons.tune_rounded, color: foreground),
-              if (isActive)
-                const Positioned(
-                  top: 11,
-                  right: 11,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+    return Semantics(
+      button: true,
+      label: 'Filter results',
+      toggled: isActive,
+      child: Tooltip(
+        message: 'Filter results',
+        child: Material(
+          color: background,
+          borderRadius: AppRadius.borderLg,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: AppRadius.borderLg,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(Icons.tune_rounded, color: foreground),
+                  if (isActive)
+                    const Positioned(
+                      top: 11,
+                      right: 11,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: SizedBox(width: 8, height: 8),
+                      ),
                     ),
-                    child: SizedBox(width: 8, height: 8),
-                  ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

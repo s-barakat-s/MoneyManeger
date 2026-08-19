@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/audit_metadata.dart';
 import '../../../../shared/models/debt.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/debt_providers.dart';
@@ -27,12 +29,14 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
   DateTime? _dueDate;
   var _isSaving = false;
   String? _errorMessage;
+  late final FinancialFormScopeGuard _scopeGuard;
 
   bool get _isEditing => widget.debt != null;
 
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
 
     final debt = widget.debt;
     if (debt != null) {
@@ -54,9 +58,9 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
+    return AdaptiveFinancialFormDialog(
       title: Text(_dialogTitle),
+      canDismiss: !_isSaving,
       content: ResponsiveDialogContent(
         child: Form(
           key: _formKey,
@@ -69,13 +73,13 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
                 decoration: InputDecoration(
                   labelText: widget.type == DebtType.weOwe
                       ? 'Creditor name'
-                      : 'Client name',
+                      : 'Debtor name',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return widget.type == DebtType.weOwe
                         ? 'Creditor name is required'
-                        : 'Client name is required';
+                        : 'Debtor name is required';
                   }
 
                   return null;
@@ -88,6 +92,7 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
+                inputFormatters: decimalAmountInputFormatters,
                 validator: (value) {
                   final amount = double.tryParse(value?.trim() ?? '');
                   if (amount == null || amount <= 0) {
@@ -167,7 +172,9 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
         DialogFormActions(
           primaryLabel: _isEditing ? 'Save' : _dialogTitle,
           onPrimaryPressed: _isSaving ? null : _save,
-          onCancelPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          onCancelPressed: _isSaving
+              ? null
+              : () => Navigator.of(context).pop(false),
           isSaving: _isSaving,
         ),
       ],
@@ -176,6 +183,21 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_dueDate != null &&
+        DateUtils.dateOnly(
+          _dueDate!,
+        ).isBefore(DateUtils.dateOnly(_createdAt))) {
+      setState(
+        () => _errorMessage = 'Due date cannot be before the created date.',
+      );
+      return;
+    }
+
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
       return;
     }
 
@@ -197,13 +219,18 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
           note: _noteController.text.trim().isEmpty
               ? null
               : _noteController.text.trim(),
-          audit:
-              widget.debt?.audit ?? AuditMetadata(createdAt: _createdAt),
+          audit: widget.debt?.audit ?? AuditMetadata(createdAt: _createdAt),
         ),
       );
 
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(
+          context,
+          _isEditing
+              ? '${_itemLabel[0].toUpperCase()}${_itemLabel.substring(1)} updated'
+              : '${_itemLabel[0].toUpperCase()}${_itemLabel.substring(1)} created',
+        );
+        Navigator.of(context).pop(true);
       }
     } on FirebaseException catch (error) {
       if (mounted) {
@@ -250,7 +277,6 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }

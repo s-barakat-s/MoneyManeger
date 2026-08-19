@@ -489,9 +489,12 @@ service cloud.firestore {
     }
 
     match /usernames/{username} {
-      allow get: if isVerified();
+      // Username reservation is part of profile bootstrap and therefore must
+      // be available before an email/password user verifies their email.
+      // Collection listing remains denied by default.
+      allow get: if isSignedIn();
 
-      allow create: if isVerified()
+      allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.username == username
         && request.resource.data.keys().hasAll(['uid', 'username', 'createdAt'])

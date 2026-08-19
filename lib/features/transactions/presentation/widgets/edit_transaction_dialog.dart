@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/models/owner.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/transaction.dart' as money;
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
@@ -26,10 +28,13 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   late money.TransactionType _type;
   late DateTime _date;
   var _isSaving = false;
+  String? _errorMessage;
+  late final FinancialFormScopeGuard _scopeGuard;
 
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
     _ownerId = widget.transaction.ownerId;
     _type = widget.transaction.type;
     _date = widget.transaction.date;
@@ -50,9 +55,9 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
-    return AlertDialog(
-      scrollable: true,
+    return AdaptiveFinancialFormDialog(
       title: const Text('Edit transaction'),
+      canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) => _TransactionForm(
           formKey: _formKey,
@@ -65,12 +70,15 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
           onOwnerChanged: (value) => setState(() => _ownerId = value),
           onTypeChanged: (value) => setState(() => _type = value),
           onDateChanged: (value) => setState(() => _date = value),
+          errorMessage: _errorMessage,
         ),
         loading: () => const SizedBox(
           height: 96,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (error, stackTrace) => Text(error.toString()),
+        error: (error, stackTrace) => FinancialFormLoadError(
+          onRetry: () => ref.invalidate(ownersStreamProvider),
+        ),
       ),
       actions: [
         DialogFormActions(
@@ -88,22 +96,44 @@ class _EditTransactionDialogState extends ConsumerState<EditTransactionDialog> {
       return;
     }
 
-    setState(() => _isSaving = true);
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
+      return;
+    }
 
-    await ref.read(updateTransactionProvider)(
-      widget.transaction.copyWith(
-        ownerId: _ownerId!,
-        type: _type,
-        amount: double.parse(_amountController.text.trim()),
-        date: _date,
-        note: _noteController.text.trim().isEmpty
-            ? null
-            : _noteController.text.trim(),
-      ),
-    );
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
 
-    if (mounted) {
-      Navigator.of(context).pop();
+    try {
+      await ref.read(updateTransactionProvider)(
+        widget.transaction.copyWith(
+          ownerId: _ownerId!,
+          type: _type,
+          amount: double.parse(_amountController.text.trim()),
+          date: _date,
+          note: _noteController.text.trim().isEmpty
+              ? null
+              : _noteController.text.trim(),
+        ),
+      );
+
+      if (mounted) {
+        showFinancialSuccess(context, 'Transaction updated');
+        Navigator.of(context).pop(true);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _errorMessage =
+              'Could not update the transaction. Check your permission and connection, then try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 }
@@ -120,6 +150,7 @@ class _TransactionForm extends StatelessWidget {
     required this.onOwnerChanged,
     required this.onTypeChanged,
     required this.onDateChanged,
+    required this.errorMessage,
   });
 
   final GlobalKey<FormState> formKey;
@@ -132,6 +163,7 @@ class _TransactionForm extends StatelessWidget {
   final ValueChanged<String?> onOwnerChanged;
   final ValueChanged<money.TransactionType> onTypeChanged;
   final ValueChanged<DateTime> onDateChanged;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +173,24 @@ class _TransactionForm extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            TextFormField(
+              controller: amountController,
+              autofocus: true,
+              decoration: amountInputDecoration('Amount'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: decimalAmountInputFormatters,
+              validator: (value) {
+                final amount = double.tryParse(value?.trim() ?? '');
+                if (amount == null || amount <= 0) {
+                  return 'Enter an amount greater than 0';
+                }
+
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: owners.any((owner) => owner.id == ownerId)
                   ? ownerId
@@ -178,22 +228,6 @@ class _TransactionForm extends StatelessWidget {
               },
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: amountController,
-              decoration: amountInputDecoration('Amount'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (value) {
-                final amount = double.tryParse(value?.trim() ?? '');
-                if (amount == null || amount <= 0) {
-                  return 'Enter a valid amount';
-                }
-
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
             DialogDateField(
               label: 'Date',
               value: _formatDate(date),
@@ -216,6 +250,13 @@ class _TransactionForm extends StatelessWidget {
               decoration: const InputDecoration(labelText: 'Note'),
               maxLines: 3,
             ),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                errorMessage!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
           ],
         ),
       ),
@@ -223,7 +264,6 @@ class _TransactionForm extends StatelessWidget {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }

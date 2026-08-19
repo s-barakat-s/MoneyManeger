@@ -2,11 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/preferences/last_used_selection_provider.dart';
 import '../../../../shared/models/owner.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/transaction.dart' as money;
+import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
 import '../../../../shared/widgets/responsive_dialog_content.dart';
+import '../../../business/application/business_access_providers.dart';
+import '../../../business/domain/permission.dart';
+import '../../../owners/presentation/widgets/add_owner_dialog.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
 import '../../application/transaction_providers.dart';
 
@@ -28,7 +32,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   String? _ownerId;
-  money.TransactionType? _initializedOwnerType;
+  late final FinancialFormScopeGuard _scopeGuard;
   late money.TransactionType _type;
   DateTime _date = DateTime.now();
   var _isSaving = false;
@@ -37,6 +41,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   @override
   void initState() {
     super.initState();
+    _scopeGuard = FinancialFormScopeGuard.capture(ref);
     _type = widget.initialType;
   }
 
@@ -51,12 +56,27 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
-    return AlertDialog(
-      scrollable: true,
+    return AdaptiveFinancialFormDialog(
       title: const Text('Add transaction'),
+      canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
           _initializeOwner(owners);
+          if (owners.isEmpty) {
+            final canCreateHolder =
+                ref.watch(canProvider(Permission.ownersCreate)).value == true;
+            return FinancialPrecondition(
+              message:
+                  'No money holder yet. Create one before recording ${_type == money.TransactionType.income ? 'income' : 'an expense'}.',
+              actionLabel: canCreateHolder ? 'Create money holder' : null,
+              onAction: canCreateHolder
+                  ? () => showDialog<bool>(
+                      context: context,
+                      builder: (context) => const AddOwnerDialog(),
+                    )
+                  : null,
+            );
+          }
           return _TransactionForm(
             formKey: _formKey,
             owners: owners,
@@ -70,7 +90,6 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
               setState(() {
                 _type = value;
                 _ownerId = null;
-                _initializedOwnerType = null;
               });
             },
             onDateChanged: (value) => setState(() => _date = value),
@@ -81,13 +100,19 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
           height: 96,
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (error, stackTrace) => Text(error.toString()),
+        error: (error, stackTrace) => FinancialFormLoadError(
+          onRetry: () => ref.invalidate(ownersStreamProvider),
+        ),
       ),
       actions: [
         DialogFormActions(
           primaryLabel: 'Add transaction',
-          onPrimaryPressed: _isSaving ? null : _save,
-          onCancelPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          onPrimaryPressed: _isSaving || ownersAsync.value?.isEmpty != false
+              ? null
+              : _save,
+          onCancelPressed: _isSaving
+              ? null
+              : () => Navigator.of(context).pop(false),
           isSaving: _isSaving,
         ),
       ],
@@ -96,6 +121,11 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_scopeGuard.isCurrent(ref)) {
+      setState(() => _errorMessage = financialContextChangedMessage);
       return;
     }
 
@@ -118,12 +148,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
         ),
       );
 
-      await ref
-          .read(lastUsedSelectionProvider)
-          .save(_selectionPreference, _ownerId!);
-
       if (mounted) {
-        Navigator.of(context).pop();
+        showFinancialSuccess(
+          context,
+          _type == money.TransactionType.income
+              ? 'Income added'
+              : 'Expense added',
+        );
+        Navigator.of(context).pop(true);
       }
     } on FirebaseException catch (error) {
       if (mounted) {
@@ -152,35 +184,14 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     };
   }
 
-  LastUsedOwnerSelection get _selectionPreference =>
-      _type == money.TransactionType.income
-      ? LastUsedOwnerSelection.income
-      : LastUsedOwnerSelection.expense;
-
   void _initializeOwner(List<Owner> owners) {
-    if (owners.isEmpty || _initializedOwnerType == _type) {
-      return;
-    }
-    final initializingType = _type;
-    _initializedOwnerType = initializingType;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final selection = initializingType == money.TransactionType.income
-          ? LastUsedOwnerSelection.income
-          : LastUsedOwnerSelection.expense;
-      final remembered = await ref
-          .read(lastUsedSelectionProvider)
-          .read(selection);
-      if (!mounted || _type != initializingType || _ownerId != null) {
-        return;
-      }
-
-      setState(() {
-        _ownerId = owners.any((owner) => owner.id == remembered)
-            ? remembered
-            : owners.first.id;
+    if (owners.length == 1 && _ownerId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _ownerId == null) {
+          setState(() => _ownerId = owners.single.id);
+        }
       });
-    });
+    }
   }
 }
 
@@ -219,6 +230,24 @@ class _TransactionForm extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            TextFormField(
+              controller: amountController,
+              autofocus: true,
+              decoration: amountInputDecoration('Amount'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: decimalAmountInputFormatters,
+              validator: (value) {
+                final amount = double.tryParse(value?.trim() ?? '');
+                if (amount == null || amount <= 0) {
+                  return 'Enter an amount greater than 0';
+                }
+
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               key: ValueKey(ownerId),
               initialValue: ownerId,
@@ -252,22 +281,6 @@ class _TransactionForm extends StatelessWidget {
                 if (value != null) {
                   onTypeChanged(value);
                 }
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: amountController,
-              decoration: amountInputDecoration('Amount'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              validator: (value) {
-                final amount = double.tryParse(value?.trim() ?? '');
-                if (amount == null || amount <= 0) {
-                  return 'Enter a valid amount';
-                }
-
-                return null;
               },
             ),
             const SizedBox(height: 12),
@@ -307,7 +320,6 @@ class _TransactionForm extends StatelessWidget {
   }
 
   String _formatDate(DateTime value) {
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }

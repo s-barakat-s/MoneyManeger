@@ -40,7 +40,7 @@ class SharedPreferencesSavedAccountRepository
         }
       }
       accounts.sort((a, b) => b.lastUsedAt.compareTo(a.lastUsedAt));
-      return accounts;
+      return _normalizeByUid(accounts);
     } on Object {
       return const [];
     }
@@ -76,4 +76,40 @@ class SharedPreferencesSavedAccountRepository
       jsonEncode(accounts.map((account) => account.toJson()).toList()),
     );
   }
+}
+
+List<SavedAccount> _normalizeByUid(List<SavedAccount> accounts) {
+  final normalized = <String, SavedAccount>{};
+  for (final account in accounts) {
+    final existing = normalized[account.uid];
+    if (existing == null) {
+      normalized[account.uid] = account;
+      continue;
+    }
+    final providers = {...existing.providerIds, ...account.providerIds}.toList()
+      ..sort();
+    normalized[account.uid] = SavedAccount(
+      uid: existing.uid,
+      email: existing.email.isNotEmpty ? existing.email : account.email,
+      username: _preferred(existing.username, account.username),
+      displayName: _preferred(existing.displayName, account.displayName),
+      photoUrl: _preferred(existing.photoUrl, account.photoUrl),
+      provider: providers.join(','),
+      lastUsedAt: existing.lastUsedAt,
+    );
+  }
+  final values = normalized.values.toList(growable: false);
+  values.sort((a, b) => b.lastUsedAt.compareTo(a.lastUsedAt));
+  return values;
+}
+
+String? _preferred(String? primary, String? fallback) {
+  final normalizedPrimary = primary?.trim();
+  if (normalizedPrimary != null && normalizedPrimary.isNotEmpty) {
+    return normalizedPrimary;
+  }
+  final normalizedFallback = fallback?.trim();
+  return normalizedFallback == null || normalizedFallback.isEmpty
+      ? null
+      : normalizedFallback;
 }

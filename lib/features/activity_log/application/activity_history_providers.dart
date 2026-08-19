@@ -1,15 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/backend/authenticated_backend_client.dart';
 import '../../business/application/business_providers.dart';
-import '../data/callable_activity_log_repository.dart';
+import '../data/http_activity_log_repository.dart';
 import '../domain/activity_log_entry.dart';
 import '../domain/activity_page.dart';
 import '../domain/repositories/activity_log_repository.dart';
 
 final activityLogRepositoryProvider = Provider<ActivityLogRepository>(
-  (ref) => CallableActivityLogRepository(
-    functions: ref.watch(firebaseFunctionsProvider),
+  (ref) => HttpActivityLogRepository(
+    backend: ref.watch(authenticatedBackendClientProvider),
   ),
 );
 

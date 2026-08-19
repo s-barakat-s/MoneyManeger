@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/firebase/firebase_providers.dart';
+import '../../../core/backend/authenticated_backend_client.dart';
 import '../../business/application/business_providers.dart';
-import '../data/callable_invitation_repository.dart';
-import '../data/callable_member_management_repository.dart';
+import '../data/http_invitation_repository.dart';
+import '../data/http_member_management_repository.dart';
 import '../domain/assignable_role.dart';
 import '../domain/business_invitation.dart';
 import '../domain/member_summary.dart';
@@ -11,14 +11,14 @@ import '../domain/repositories/invitation_repository.dart';
 import '../domain/repositories/member_management_repository.dart';
 
 final memberManagementRepositoryProvider = Provider<MemberManagementRepository>(
-  (ref) => CallableMemberManagementRepository(
-    functions: ref.watch(firebaseFunctionsProvider),
+  (ref) => HttpMemberManagementRepository(
+    backend: ref.watch(authenticatedBackendClientProvider),
   ),
 );
 
 final invitationRepositoryProvider = Provider<InvitationRepository>(
-  (ref) => CallableInvitationRepository(
-    functions: ref.watch(firebaseFunctionsProvider),
+  (ref) => HttpInvitationRepository(
+    backend: ref.watch(authenticatedBackendClientProvider),
   ),
 );
 
@@ -58,46 +58,53 @@ class MemberMutationController extends Notifier<AsyncValue<void>> {
   @override
   AsyncValue<void> build() => const AsyncData(null);
 
-  Future<bool> changeRole(String targetUid, String roleId) {
+  Future<bool> changeRole({
+    required String businessId,
+    required String targetUid,
+    required String roleId,
+  }) {
     return _run(
       () => ref
           .read(memberManagementRepositoryProvider)
           .changeRole(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             targetUid: targetUid,
             roleId: roleId,
           ),
     );
   }
 
-  Future<bool> suspend(String targetUid) {
+  Future<bool> suspend({required String businessId, required String targetUid}) {
     return _run(
       () => ref
           .read(memberManagementRepositoryProvider)
           .suspend(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             targetUid: targetUid,
           ),
     );
   }
 
-  Future<bool> reactivate(String targetUid) {
+  Future<bool> reactivate({
+    required String businessId,
+    required String targetUid,
+  }) {
     return _run(
       () => ref
           .read(memberManagementRepositoryProvider)
           .reactivate(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             targetUid: targetUid,
           ),
     );
   }
 
-  Future<bool> remove(String targetUid) {
+  Future<bool> remove({required String businessId, required String targetUid}) {
     return _run(
       () => ref
           .read(memberManagementRepositoryProvider)
           .remove(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             targetUid: targetUid,
           ),
     );
@@ -121,12 +128,16 @@ class InvitationMutationController extends Notifier<AsyncValue<void>> {
   @override
   AsyncValue<void> build() => const AsyncData(null);
 
-  Future<bool> create({required String email, required String roleId}) {
+  Future<bool> create({
+    required String businessId,
+    required String email,
+    required String roleId,
+  }) {
     return _run(
       () => ref
           .read(invitationRepositoryProvider)
           .create(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             email: email,
             roleId: roleId,
           ),
@@ -134,12 +145,15 @@ class InvitationMutationController extends Notifier<AsyncValue<void>> {
     );
   }
 
-  Future<bool> revoke(String invitationId) {
+  Future<bool> revoke({
+    required String businessId,
+    required String invitationId,
+  }) {
     return _run(
       () => ref
           .read(invitationRepositoryProvider)
           .revoke(
-            businessId: ref.read(activeBusinessIdProvider),
+            businessId: businessId,
             invitationId: invitationId,
           ),
       invalidateBusinessInvitations: true,

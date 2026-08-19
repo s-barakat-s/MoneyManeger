@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/owner.dart';
 import '../../../shared/models/transaction.dart' as money;
 import '../../../shared/widgets/amount_text.dart';
@@ -44,7 +44,8 @@ class DashboardPage extends ConsumerWidget {
         if (ref.watch(canProvider(permission)).value == true) permission,
     };
     final canReadOwners = readable.contains(Permission.ownersRead);
-    final canReadCash = canReadOwners &&
+    final canReadCash =
+        canReadOwners &&
         readable.contains(Permission.transactionsRead) &&
         readable.contains(Permission.transfersRead);
     final ownersAsync = canReadOwners
@@ -106,7 +107,6 @@ class DashboardPage extends ConsumerWidget {
     ref.invalidate(owedToUsDebtsStreamProvider);
     ref.invalidate(assetsStreamProvider);
   }
-
 }
 
 class _DashboardHome extends StatelessWidget {
@@ -359,7 +359,7 @@ class _BalanceHeroCard extends StatelessWidget {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
-                          'Company Worth',
+                          'Business Worth',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.78),
@@ -601,9 +601,9 @@ class _CompanyWorthBreakdown extends StatelessWidget {
     final worth = worthAsync.value ?? 0;
 
     return _BreakdownCard(
-      title: 'Company Worth',
+      title: 'Business Worth',
       description:
-          'Company Worth = Available Cash + Receivables + Assets - Debts.',
+          'Business Worth = Available Cash + Receivables + Assets - Debts.',
       children: [
         _BreakdownAmountRow(
           label: 'Available Cash',
@@ -628,7 +628,7 @@ class _CompanyWorthBreakdown extends StatelessWidget {
         ),
         const Divider(height: AppSpacing.xl),
         _BreakdownAmountRow(
-          label: 'Company Worth',
+          label: 'Business Worth',
           amount: worth,
           color: worth > 0
               ? AppColors.success
@@ -796,38 +796,38 @@ class _FinancialSnapshotGrid extends StatelessWidget {
     final shortcuts = [
       if (readable.contains(Permission.debtsRead))
         _MetricData(
-        title: 'Debts',
-        value: _moneyValue(debtsAsync.whenData((value) => value.remaining)),
-        icon: Icons.warning_amber_rounded,
-        color: AppColors.danger,
-        route: AppRoute.debts,
-      ),
+          title: 'Debts',
+          value: _moneyValue(debtsAsync.whenData((value) => value.remaining)),
+          icon: Icons.warning_amber_rounded,
+          color: AppColors.danger,
+          route: AppRoute.debts,
+        ),
       if (readable.contains(Permission.receivablesRead))
         _MetricData(
-        title: 'Receivables',
-        value: _moneyValue(
-          receivablesAsync.whenData((value) => value.remaining),
+          title: 'Receivables',
+          value: _moneyValue(
+            receivablesAsync.whenData((value) => value.remaining),
+          ),
+          icon: Icons.payments_rounded,
+          color: AppColors.info,
+          route: AppRoute.receivables,
         ),
-        icon: Icons.payments_rounded,
-        color: AppColors.info,
-        route: AppRoute.receivables,
-      ),
       if (readable.contains(Permission.assetsRead))
         _MetricData(
-        title: 'Assets',
-        value: _moneyValue(assetsAsync),
-        icon: Icons.business_center_rounded,
-        color: AppColors.warning,
-        route: AppRoute.companyAssets,
-      ),
+          title: 'Assets',
+          value: _moneyValue(assetsAsync),
+          icon: Icons.business_center_rounded,
+          color: AppColors.warning,
+          route: AppRoute.companyAssets,
+        ),
       if (readable.contains(Permission.ownersRead))
         _MetricData(
-        title: 'Money Holders',
-        value: owners.length.toString(),
-        icon: Icons.group_rounded,
-        color: AppColors.primary,
-        route: AppRoute.owners,
-      ),
+          title: 'Money Holders',
+          value: owners.length.toString(),
+          icon: Icons.group_rounded,
+          color: AppColors.primary,
+          route: AppRoute.owners,
+        ),
     ];
 
     return _DashboardSection(
@@ -974,15 +974,15 @@ class _RecentActivitySection extends StatelessWidget {
     final ownerNames = {for (final owner in owners) owner.id: owner.name};
 
     return _DashboardSection(
-      title: 'Recent Activity',
+      title: 'Recent Transactions',
       child: transactionsAsync.when(
         data: (transactions) {
           final latest = transactions.take(5).toList();
           if (latest.isEmpty) {
             return const EmptyState(
               icon: Icons.history_rounded,
-              title: 'No recent activity yet.',
-              description: 'Income and expense activity will appear here.',
+              title: 'No recent transactions yet.',
+              description: 'Income and expenses will appear here.',
             );
           }
 
@@ -999,7 +999,7 @@ class _RecentActivitySection extends StatelessWidget {
         },
         loading: () => const LoadingSkeleton(itemCount: 3),
         error: (error, stackTrace) => const ErrorState(
-          title: 'Activity unavailable',
+          title: 'Recent transactions unavailable',
           message: 'We could not load recent transactions.',
         ),
       ),
@@ -1275,11 +1275,10 @@ String _moneyValue(AsyncValue<double> value) {
   return value.when(
     data: formatEgpCurrency,
     loading: () => 'Loading...',
-    error: (error, stackTrace) => kDebugMode ? 'Error: $error' : 'Unavailable',
+    error: (error, stackTrace) => 'Unavailable',
   );
 }
 
 String _formatDate(DateTime value) {
-  return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-      '${value.day.toString().padLeft(2, '0')}';
+  return formatReadableDate(value);
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/debt.dart';
 import '../../../shared/widgets/amount_text.dart';
 import '../../../shared/widgets/app_card.dart';
@@ -72,28 +74,32 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
     final activeDebtsAsync = ref.watch(weOweDebtsProvider);
     final archivedDebtsAsync = ref.watch(archivedWeOweDebtsProvider);
     final summaryAsync = ref.watch(debtSummaryProvider);
-    final canCreate = ref.watch(canProvider(Permission.debtsCreate)).value == true;
-    final canUpdate = ref.watch(canProvider(Permission.debtsUpdate)).value == true;
-    final canArchive = ref.watch(canProvider(Permission.debtsArchive)).value == true;
+    final canCreate =
+        ref.watch(canProvider(Permission.debtsCreate)).value == true;
+    final canUpdate =
+        ref.watch(canProvider(Permission.debtsUpdate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.debtsArchive)).value == true;
 
-    return HomeSummaryHero(
-      tag: HomeSummaryHeroTags.debts,
-      child: AppShell(
-        title: 'Debts',
-        currentLocation: widget.currentLocation,
-        showMobileAppBarTitle: false,
-        child: DefaultTabController(
-          length: 2,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PageHeader(
-                title: 'Debts',
-                actionLabel: canCreate ? 'Add debt' : null,
-                onAction: canCreate ? () => _showAddDialog(context) : null,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              summaryAsync.when(
+    return AppShell(
+      title: 'Debts',
+      currentLocation: widget.currentLocation,
+      secondaryParent: AppRoute.dashboard,
+      showMobileAppBarTitle: false,
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PageHeader(
+              title: 'Debts',
+              actionLabel: canCreate ? 'Add debt' : null,
+              onAction: canCreate ? () => _showAddDialog(context) : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            HomeSummaryHero(
+              tag: HomeSummaryHeroTags.debts,
+              child: summaryAsync.when(
                 data: (summary) => _SummaryCard(
                   label: 'Total debts',
                   value: formatEgpCurrency(summary.remaining),
@@ -104,78 +110,79 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
                   message: 'We could not load your debt summary right now.',
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              AppSearchFilterBar(
-                controller: _searchController,
-                hintText: 'Search debts',
-                filtersActive: _hasPanelFilters,
-                onFilterTap: _showFilterSheet,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TabBar(
-                dividerColor: Theme.of(context).colorScheme.outline,
-                indicatorColor: AppColors.primary,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: Theme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant,
-                tabs: const [
-                  Tab(text: 'Active'),
-                  Tab(text: 'Archived'),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            AppSearchFilterBar(
+              controller: _searchController,
+              hintText: 'Search debts',
+              filtersActive: _hasPanelFilters,
+              onFilterTap: _showFilterSheet,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TabBar(
+              dividerColor: Theme.of(context).colorScheme.outline,
+              indicatorColor: AppColors.primary,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant,
+              tabs: const [
+                Tab(text: 'Active'),
+                Tab(text: 'Archived'),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  activeDebtsAsync.when(
+                    data: (debts) => _DebtsList(
+                      debts: debts,
+                      searchText: _searchText,
+                      statusFilter: _statusFilter,
+                      onClearFilters: _clearAllFilters,
+                      emptyTitle: 'No active debts',
+                      emptyDescription: 'Add money your Business owes.',
+                      onAdd: canCreate ? () => _showAddDialog(context) : null,
+                      canUpdate: canUpdate,
+                      canArchive: canArchive,
+                    ),
+                    loading: () => const LoadingSkeleton(itemCount: 4),
+                    error: (error, stackTrace) => const ErrorState(
+                      title: 'Debts unavailable',
+                      message: 'We could not load active debts right now.',
+                    ),
+                  ),
+                  archivedDebtsAsync.when(
+                    data: (debts) => _DebtsList(
+                      debts: debts,
+                      searchText: _searchText,
+                      statusFilter: _statusFilter,
+                      onClearFilters: _clearAllFilters,
+                      emptyTitle: 'No archived debts',
+                      emptyDescription:
+                          'Archived debts will appear here when you archive them.',
+                      onAdd: null,
+                      canUpdate: canUpdate,
+                      canArchive: canArchive,
+                    ),
+                    loading: () => const LoadingSkeleton(itemCount: 4),
+                    error: (error, stackTrace) => const ErrorState(
+                      title: 'Archived debts unavailable',
+                      message: 'We could not load archived debts right now.',
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.md),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    activeDebtsAsync.when(
-                      data: (debts) => _DebtsList(
-                        debts: debts,
-                        searchText: _searchText,
-                        statusFilter: _statusFilter,
-                        onClearFilters: _clearAllFilters,
-                        emptyTitle: 'No active debts',
-                        emptyDescription:
-                            'Debts you owe will appear here once added.',
-                        canUpdate: canUpdate,
-                        canArchive: canArchive,
-                      ),
-                      loading: () => const LoadingSkeleton(itemCount: 4),
-                      error: (error, stackTrace) => const ErrorState(
-                        title: 'Debts unavailable',
-                        message: 'We could not load active debts right now.',
-                      ),
-                    ),
-                    archivedDebtsAsync.when(
-                      data: (debts) => _DebtsList(
-                        debts: debts,
-                        searchText: _searchText,
-                        statusFilter: _statusFilter,
-                        onClearFilters: _clearAllFilters,
-                        emptyTitle: 'No archived debts',
-                        emptyDescription:
-                            'Archived debts will appear here when you archive them.',
-                        canUpdate: canUpdate,
-                        canArchive: canArchive,
-                      ),
-                      loading: () => const LoadingSkeleton(itemCount: 4),
-                      error: (error, stackTrace) => const ErrorState(
-                        title: 'Archived debts unavailable',
-                        message: 'We could not load archived debts right now.',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _showAddDialog(BuildContext context) {
-    return showDialog<void>(
+  Future<bool?> _showAddDialog(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => const AddDebtDialog(type: DebtType.weOwe),
     );
@@ -190,10 +197,17 @@ class _DebtsPageState extends ConsumerState<DebtsPage> {
     }
 
     _handledQuickAddTrigger = trigger;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         if (ref.read(canProvider(Permission.debtsCreate)).value == true) {
-          _showAddDialog(context);
+          final saved = await _showAddDialog(context);
+          if (!mounted) return;
+          completeQuickAddNavigation(
+            context,
+            saved: saved == true,
+            destination: AppRoute.debts,
+            cancelFallback: AppRoute.dashboard,
+          );
         }
       }
     });
@@ -283,6 +297,7 @@ class _DebtsList extends StatelessWidget {
     required this.onClearFilters,
     required this.emptyTitle,
     required this.emptyDescription,
+    required this.onAdd,
     required this.canUpdate,
     required this.canArchive,
   });
@@ -293,6 +308,7 @@ class _DebtsList extends StatelessWidget {
   final VoidCallback onClearFilters;
   final String emptyTitle;
   final String emptyDescription;
+  final VoidCallback? onAdd;
   final bool canUpdate;
   final bool canArchive;
 
@@ -326,6 +342,13 @@ class _DebtsList extends StatelessWidget {
         icon: Icons.warning_amber_rounded,
         title: emptyTitle,
         description: emptyDescription,
+        action: onAdd == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add debt'),
+              ),
       );
     }
 
@@ -586,9 +609,7 @@ class _DebtListItem extends ConsumerWidget {
   Future<void> _restoreDebt(BuildContext context, WidgetRef ref) async {
     try {
       await ref.read(createDebtProvider)(
-        debt.copyWith(
-          status: DebtStatus.active,
-        ),
+        debt.copyWith(status: DebtStatus.active),
       );
     } catch (_) {
       if (context.mounted) {
@@ -852,6 +873,5 @@ bool _matchesDebtStatus(Debt debt, _DebtStatusFilter filter) {
 }
 
 String _formatDate(DateTime value) {
-  return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-      '${value.day.toString().padLeft(2, '0')}';
+  return formatReadableDate(value);
 }

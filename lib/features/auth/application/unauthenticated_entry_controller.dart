@@ -41,6 +41,7 @@ class UnauthenticatedEntryController
   }
 
   void showSavedAccounts() {
+    if (!state.forceShowLogin) return;
     state = const UnauthenticatedEntryState();
   }
 

@@ -6,6 +6,8 @@
   },
   "tasks": {
     "check": "deno check main.ts",
-    "start": "deno run --allow-env --allow-net main.ts"
+    "start": "deno run --allow-env --allow-net main.ts",
+    "validation-token": "deno run --env-file=.env.validation.local --allow-env=FIREBASE_TEST_EMAIL,FIREBASE_TEST_PASSWORD --allow-net=identitytoolkit.googleapis.com --allow-read=.env.validation.local,../../android/app/google-services.json --allow-write=.env.validation.local acquire_test_token.ts",
+    "validation-live": "deno run --env-file=.env.validation.local --allow-env=FIREBASE_ID_TOKEN,DENO_BASE_URL --allow-net=moneymaneger.1sbarakats.deno.net validate_live.ts"
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/owner.dart';
 import '../../../shared/models/transfer.dart';
 import '../../../shared/widgets/amount_text.dart';
@@ -87,7 +89,7 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
             children: [
               PageHeader(
                 title: 'Transfers',
-                actionLabel: canCreate ? 'Add transfer' : null,
+                actionLabel: canCreate ? 'Transfer money' : null,
                 onAction: canCreate ? () => _showAddDialog(context) : null,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -106,6 +108,7 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
                   selectedFromOwnerId: _selectedFromOwnerId,
                   selectedToOwnerId: _selectedToOwnerId,
                   onClearFilters: _clearAllFilters,
+                  onAdd: canCreate ? () => _showAddDialog(context) : null,
                   canArchive: canArchive,
                 ),
               ),
@@ -179,8 +182,8 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
     );
   }
 
-  Future<void> _showAddDialog(BuildContext context) {
-    return showDialog<void>(
+  Future<bool?> _showAddDialog(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => const AddTransferDialog(),
     );
@@ -195,13 +198,20 @@ class _TransfersPageState extends ConsumerState<TransfersPage> {
     }
 
     _handledQuickAddTrigger = trigger;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
         return;
       }
 
       if (ref.read(canProvider(Permission.transfersCreate)).value == true) {
-        _showAddDialog(context);
+        final saved = await _showAddDialog(context);
+        if (!mounted) return;
+        completeQuickAddNavigation(
+          context,
+          saved: saved == true,
+          destination: AppRoute.transfers,
+          cancelFallback: AppRoute.transfers,
+        );
       }
     });
   }
@@ -315,6 +325,7 @@ class _TransfersList extends StatelessWidget {
     required this.selectedFromOwnerId,
     required this.selectedToOwnerId,
     required this.onClearFilters,
+    required this.onAdd,
     required this.canArchive,
   });
 
@@ -324,6 +335,7 @@ class _TransfersList extends StatelessWidget {
   final String? selectedFromOwnerId;
   final String? selectedToOwnerId;
   final VoidCallback onClearFilters;
+  final VoidCallback? onAdd;
   final bool canArchive;
 
   @override
@@ -362,10 +374,17 @@ class _TransfersList extends StatelessWidget {
     }).toList();
 
     if (transfers.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.swap_horiz_rounded,
-        title: 'No transfers yet.',
-        description: 'Money movements between holders will appear here.',
+        title: 'No transfers yet',
+        description: 'Move money between your money holders.',
+        action: onAdd == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text('Transfer money'),
+              ),
       );
     }
 
@@ -428,16 +447,16 @@ class _TransfersList extends StatelessWidget {
                   ),
                   if (canArchive)
                     PopupMenuButton<_TransferAction>(
-                    tooltip: 'More actions',
-                    icon: const Icon(Icons.more_horiz_rounded),
-                    onSelected: (_) => _showDeleteDialog(context, transfer),
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: _TransferAction.archive,
-                        child: Text('Archive'),
-                      ),
-                    ],
-                  ),
+                      tooltip: 'More actions',
+                      icon: const Icon(Icons.more_horiz_rounded),
+                      onSelected: (_) => _showDeleteDialog(context, transfer),
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                          value: _TransferAction.archive,
+                          child: Text('Archive'),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ],
@@ -455,16 +474,7 @@ class _TransfersList extends StatelessWidget {
   }
 
   String _formatTransferDate(DateTime value) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final transferDate = DateTime(value.year, value.month, value.day);
-
-    if (transferDate == today) {
-      return 'Today';
-    }
-
-    return '${value.year}-${value.month.toString().padLeft(2, '0')}-'
-        '${value.day.toString().padLeft(2, '0')}';
+    return formatReadableDate(value);
   }
 }
 

@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../firebase_options.dart';
@@ -46,9 +45,4 @@ final firebaseFirestoreProvider = Provider<FirebaseFirestore>((ref) {
   final firestore = FirebaseFirestore.instanceFor(app: app);
   firestore.settings = const Settings(persistenceEnabled: false);
   return firestore;
-});
-
-final firebaseFunctionsProvider = Provider<FirebaseFunctions>((ref) {
-  final app = ref.watch(firebaseAppProvider);
-  return FirebaseFunctions.instanceFor(app: app, region: 'europe-west1');
 });

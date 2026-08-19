@@ -20,38 +20,45 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: AppRadius.borderXl,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Icon(
-                  icon,
-                  size: 32,
-                  color: Theme.of(context).colorScheme.primary,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: AppRadius.borderXl,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Icon(
+                    icon,
+                    size: 32,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (action != null) ...[
-              const SizedBox(height: AppSpacing.xl),
-              action!,
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (action != null) ...[
+                const SizedBox(height: AppSpacing.xl),
+                action!,
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

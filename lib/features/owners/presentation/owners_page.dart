@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/finance/balance_providers.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
@@ -56,48 +57,53 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
   @override
   Widget build(BuildContext context) {
     final ownersAsync = ref.watch(ownersStreamProvider);
-    final canCreate = ref.watch(canProvider(Permission.ownersCreate)).value == true;
-    final canUpdate = ref.watch(canProvider(Permission.ownersUpdate)).value == true;
-    final canArchive = ref.watch(canProvider(Permission.ownersArchive)).value == true;
+    final canCreate =
+        ref.watch(canProvider(Permission.ownersCreate)).value == true;
+    final canUpdate =
+        ref.watch(canProvider(Permission.ownersUpdate)).value == true;
+    final canArchive =
+        ref.watch(canProvider(Permission.ownersArchive)).value == true;
 
-    return HomeSummaryHero(
-      tag: HomeSummaryHeroTags.owners,
-      child: AppShell(
-        title: 'Owners / Money Holders',
-        currentLocation: widget.currentLocation,
-        showMobileAppBarTitle: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PageHeader(
+    return AppShell(
+      title: 'Owners / Money Holders',
+      currentLocation: widget.currentLocation,
+      secondaryParent: AppRoute.dashboard,
+      showMobileAppBarTitle: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          HomeSummaryHero(
+            tag: HomeSummaryHeroTags.owners,
+            child: PageHeader(
               title: 'Owners / Money Holders',
               actionLabel: canCreate ? 'Add holder' : null,
               actionIcon: Icons.add,
               onAction: canCreate ? () => _showAddDialog(context) : null,
             ),
-            const SizedBox(height: AppSpacing.md),
-            Expanded(
-              child: ownersAsync.when(
-                data: (owners) => _OwnersList(
-                  owners: owners,
-                  canUpdate: canUpdate,
-                  canArchive: canArchive,
-                ),
-                loading: () => const LoadingSkeleton(itemCount: 4),
-                error: (error, stackTrace) => const ErrorState(
-                  title: 'Money holders unavailable',
-                  message: 'We could not load your money holders right now.',
-                ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Expanded(
+            child: ownersAsync.when(
+              data: (owners) => _OwnersList(
+                owners: owners,
+                onAdd: canCreate ? () => _showAddDialog(context) : null,
+                canUpdate: canUpdate,
+                canArchive: canArchive,
+              ),
+              loading: () => const LoadingSkeleton(itemCount: 4),
+              error: (error, stackTrace) => const ErrorState(
+                title: 'Money holders unavailable',
+                message: 'We could not load your money holders right now.',
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _showAddDialog(BuildContext context) {
-    return showDialog<void>(
+  Future<bool?> _showAddDialog(BuildContext context) {
+    return showDialog<bool>(
       context: context,
       builder: (context) => const AddOwnerDialog(),
     );
@@ -112,10 +118,17 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
     }
 
     _handledQuickAddTrigger = trigger;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         if (ref.read(canProvider(Permission.ownersCreate)).value == true) {
-          _showAddDialog(context);
+          final saved = await _showAddDialog(context);
+          if (!mounted) return;
+          completeQuickAddNavigation(
+            context,
+            saved: saved == true,
+            destination: AppRoute.owners,
+            cancelFallback: AppRoute.dashboard,
+          );
         }
       }
     });
@@ -125,22 +138,30 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
 class _OwnersList extends ConsumerWidget {
   const _OwnersList({
     required this.owners,
+    required this.onAdd,
     required this.canUpdate,
     required this.canArchive,
   });
 
   final List<Owner> owners;
+  final VoidCallback? onAdd;
   final bool canUpdate;
   final bool canArchive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (owners.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.account_balance_wallet_rounded,
-        title: 'No money holders yet.',
-        description:
-            'Add people, wallets, safes, or accounts that hold business cash.',
+        title: 'No money holders yet',
+        description: 'Add a cash account, bank account, wallet, or safe.',
+        action: onAdd == null
+            ? null
+            : FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add money holder'),
+              ),
       );
     }
 
@@ -196,15 +217,15 @@ class _OwnersList extends ConsumerWidget {
               const SizedBox(width: AppSpacing.sm),
               if (canUpdate || canArchive)
                 PopupMenuButton<_OwnerAction>(
-                tooltip: 'More actions',
-                icon: const Icon(Icons.more_horiz_rounded),
-                onSelected: (action) {
-                  if (action == _OwnerAction.edit) {
-                    _showEditDialog(context, owner);
-                  } else {
-                    _showDeleteDialog(context, owner);
-                  }
-                },
+                  tooltip: 'More actions',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (action) {
+                    if (action == _OwnerAction.edit) {
+                      _showEditDialog(context, owner);
+                    } else {
+                      _showDeleteDialog(context, owner);
+                    }
+                  },
                   itemBuilder: (context) => [
                     if (canUpdate)
                       const PopupMenuItem(

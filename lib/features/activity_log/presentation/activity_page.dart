@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_shell.dart';
 import '../../../shared/widgets/bottom_nav_spacer.dart';
@@ -22,6 +23,7 @@ class ActivityPage extends ConsumerWidget {
     return AppShell(
       title: 'Activity',
       currentLocation: currentLocation,
+      secondaryParent: AppRoute.settings,
       showMobileAppBarTitle: false,
       child: history.when(
         loading: () => ListView(
@@ -67,7 +69,7 @@ class ActivityPage extends ConsumerWidget {
                   icon: Icons.history_rounded,
                   title: 'No activity yet',
                   description:
-                      'Actions performed in this business will appear here.',
+                      'Important Business and team changes will appear here.',
                 )
               else
                 for (var index = 0; index < state.entries.length; index++) ...[
