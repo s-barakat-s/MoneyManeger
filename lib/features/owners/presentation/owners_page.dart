@@ -5,6 +5,7 @@ import '../../../core/finance/balance_providers.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/models/owner.dart';
@@ -65,7 +66,7 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
         ref.watch(canProvider(Permission.ownersArchive)).value == true;
 
     return AppShell(
-      title: 'Owners / Money Holders',
+      title: 'Money Holders',
       currentLocation: widget.currentLocation,
       secondaryParent: AppRoute.dashboard,
       showMobileAppBarTitle: false,
@@ -75,7 +76,7 @@ class _OwnersPageState extends ConsumerState<OwnersPage> {
           HomeSummaryHero(
             tag: HomeSummaryHeroTags.owners,
             child: PageHeader(
-              title: 'Owners / Money Holders',
+              title: 'Money Holders',
               actionLabel: canCreate ? 'Add holder' : null,
               actionIcon: Icons.add,
               onAction: canCreate ? () => _showAddDialog(context) : null,
@@ -173,6 +174,82 @@ class _OwnersList extends ConsumerWidget {
       itemBuilder: (context, index) {
         final owner = owners[index];
         final balance = ref.watch(ownerBalanceProvider(owner.id));
+        final isDesktop =
+            MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+        final balanceText = balance.when(
+          data: formatEgpCurrency,
+          loading: () => 'Loading balance...',
+          error: (error, stackTrace) => 'Balance unavailable',
+        );
+
+        if (isDesktop) {
+          return AppCard(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                _OwnerAvatar(initial: _ownerInitial(owner.name)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        owner.name.isEmpty ? 'Unnamed holder' : owner.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Money holder',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  balanceText,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                if (canUpdate || canArchive) ...[
+                  const SizedBox(width: AppSpacing.md),
+                  PopupMenuButton<_OwnerAction>(
+                    tooltip: 'More actions',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (action) {
+                      if (action == _OwnerAction.edit) {
+                        _showEditDialog(context, owner);
+                      } else {
+                        _showDeleteDialog(context, owner);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (canUpdate)
+                        const PopupMenuItem(
+                          value: _OwnerAction.edit,
+                          child: Text('Edit'),
+                        ),
+                      if (canArchive)
+                        const PopupMenuItem(
+                          value: _OwnerAction.archive,
+                          child: Text('Archive'),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
+        }
 
         return AppCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -195,26 +272,16 @@ class _OwnersList extends ConsumerWidget {
                       'Money holder',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      balance.when(
-                        data: formatEgpCurrency,
-                        loading: () => 'Loading balance...',
-                        error: (error, stackTrace) => 'Balance unavailable',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                balanceText,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
               if (canUpdate || canArchive)
                 PopupMenuButton<_OwnerAction>(
                   tooltip: 'More actions',

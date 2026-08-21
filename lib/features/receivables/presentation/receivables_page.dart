@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -20,6 +21,7 @@ import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../debts/application/debt_providers.dart';
 import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_actor_name_providers.dart';
 import '../../business/domain/permission.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../debts/presentation/widgets/add_debt_dialog.dart';
@@ -467,6 +469,16 @@ class _ReceivableListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final creatorUid = receivable.audit.createdBy;
+    final actorNamesAsync = creatorUid == null
+        ? null
+        : ref.watch(actorNamesProvider(creatorUid));
+    final creatorName = creatorUid == null
+        ? null
+        : !actorNamesAsync!.hasValue
+        ? null
+        : actorNamesAsync.value?[creatorUid] ??
+              'Unknown member';
     final remainingAmount = (receivable.totalAmount - receivable.paidAmount)
         .clamp(0, double.infinity)
         .toDouble();
@@ -475,6 +487,156 @@ class _ReceivableListItem extends ConsumerWidget {
     final isActive = receivable.status == DebtStatus.active;
     final canRestore =
         receivable.status == DebtStatus.archived && remainingAmount > 0;
+
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+    final actionWidget = isActive && canUpdate
+        ? (isDesktop
+              ? OutlinedButton.icon(
+                  onPressed: remainingAmount > 0
+                      ? () => _showCollectionDialog(
+                          context,
+                          receivable,
+                          remainingAmount,
+                        )
+                      : null,
+                  icon: const Icon(Icons.payments_outlined, size: 16),
+                  label: const Text('Collect'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                  ),
+                )
+              : FilledButton.icon(
+                  onPressed: remainingAmount > 0
+                      ? () => _showCollectionDialog(
+                          context,
+                          receivable,
+                          remainingAmount,
+                        )
+                      : null,
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Collect'),
+                ))
+        : (canRestore && canUpdate
+              ? OutlinedButton.icon(
+                  onPressed: () => _restoreReceivable(context, ref),
+                  icon: const Icon(Icons.restore, size: 16),
+                  label: const Text('Restore'),
+                )
+              : const SizedBox.shrink());
+
+    if (isDesktop) {
+      return AppCard(
+        onTap: () => _showDetailsSheet(context, receivable, remainingAmount),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            const _ReceivableIcon(icon: Icons.person_rounded),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    receivable.personName.isEmpty
+                        ? 'Unnamed client'
+                        : receivable.personName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (receivable.dueDate != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Due ${_formatDate(receivable.dueDate!)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  if (creatorName != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Created by $creatorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _StatusBadge(status: status),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AmountText(
+                    amountText: formatEgpCurrency(remainingAmount),
+                    variant: AmountTextVariant.income,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Collected ${formatEgpCurrency(receivable.paidAmount)} of ${formatEgpCurrency(receivable.totalAmount)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            SizedBox(
+              width: 100,
+              child: ClipRRect(
+                borderRadius: AppRadius.borderSm,
+                child: LinearProgressIndicator(
+                  minHeight: 6,
+                  value: progress,
+                  backgroundColor: AppColors.info.withValues(alpha: 0.12),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.info,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            actionWidget,
+            if (canUpdate || canArchive) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _ReceivableMenu(
+                receivable: receivable,
+                canUpdate: canUpdate,
+                canArchive: canArchive,
+                onEdit: () => _showEditDialog(context, receivable),
+                onArchive: () => _showDeleteDialog(context, receivable),
+                onMarkCollected: canUpdate && remainingAmount > 0
+                    ? () => _showCollectionDialog(
+                        context,
+                        receivable,
+                        remainingAmount,
+                        prefillAmount: remainingAmount,
+                      )
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return AppCard(
       onTap: () => _showDetailsSheet(context, receivable, remainingAmount),
@@ -488,13 +650,29 @@ class _ReceivableListItem extends ConsumerWidget {
               const _ReceivableIcon(icon: Icons.person_rounded),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: Text(
-                  receivable.personName.isEmpty
-                      ? 'Unnamed client'
-                      : receivable.personName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      receivable.personName.isEmpty
+                          ? 'Unnamed client'
+                          : receivable.personName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (creatorName != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Created by $creatorName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -517,34 +695,14 @@ class _ReceivableListItem extends ConsumerWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           Text('Remaining', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSpacing.xs),
           AmountText(
             amountText: formatEgpCurrency(remainingAmount),
             variant: AmountTextVariant.income,
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _MetaText(
-                label: 'Total',
-                value: formatEgpCurrency(receivable.totalAmount),
-              ),
-              _MetaText(
-                label: 'Collected',
-                value: formatEgpCurrency(receivable.paidAmount),
-              ),
-              if (receivable.dueDate != null)
-                _MetaText(
-                  label: 'Due',
-                  value: _formatDate(receivable.dueDate!),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           ClipRRect(
             borderRadius: AppRadius.borderSm,
             child: LinearProgressIndicator(
@@ -554,30 +712,25 @@ class _ReceivableListItem extends ConsumerWidget {
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.info),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Collected ${formatEgpCurrency(receivable.paidAmount)} of ${formatEgpCurrency(receivable.totalAmount)}',
-            style: Theme.of(context).textTheme.bodySmall,
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Collected ${formatEgpCurrency(receivable.paidAmount)} of ${formatEgpCurrency(receivable.totalAmount)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (receivable.dueDate != null)
+                Text(
+                  'Due ${_formatDate(receivable.dueDate!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (isActive && canUpdate)
-            FilledButton.icon(
-              onPressed: remainingAmount > 0
-                  ? () => _showCollectionDialog(
-                      context,
-                      receivable,
-                      remainingAmount,
-                    )
-                  : null,
-              icon: const Icon(Icons.payments_outlined),
-              label: const Text('Collect'),
-            )
-          else if (canRestore && canUpdate)
-            FilledButton.icon(
-              onPressed: () => _restoreReceivable(context, ref),
-              icon: const Icon(Icons.restore),
-              label: const Text('Restore to Active'),
-            ),
+          if (isActive && canUpdate || canRestore && canUpdate) ...[
+            const SizedBox(height: AppSpacing.md),
+            actionWidget,
+          ],
         ],
       ),
     );

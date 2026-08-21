@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -20,6 +21,7 @@ import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../application/company_asset_providers.dart';
 import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_actor_name_providers.dart';
 import '../../business/domain/permission.dart';
 import 'asset_category_label.dart';
 import 'widgets/asset_form_dialog.dart';
@@ -350,7 +352,7 @@ class _AssetFilterSheetState extends State<_AssetFilterSheet> {
   }
 }
 
-class _AssetListItem extends StatelessWidget {
+class _AssetListItem extends ConsumerWidget {
   const _AssetListItem({
     required this.asset,
     required this.canUpdate,
@@ -362,8 +364,102 @@ class _AssetListItem extends StatelessWidget {
   final bool canArchive;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final note = asset.note?.trim();
+    final creatorUid = asset.audit.createdBy;
+    final actorNamesAsync = creatorUid == null
+        ? null
+        : ref.watch(actorNamesProvider(creatorUid));
+    final creatorName = creatorUid == null
+        ? null
+        : !actorNamesAsync!.hasValue
+        ? null
+        : actorNamesAsync.value?[creatorUid] ??
+              'Unknown member';
+
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+    if (isDesktop) {
+      return AppCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            _AssetIcon(icon: _iconFor(asset.category)),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    asset.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (note != null && note.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      note,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  if (creatorName != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Created by $creatorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _CategoryBadge(label: asset.category.label),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AmountText(
+                    amountText: formatEgpCurrency(asset.purchasePrice),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Purchased ${_formatDate(asset.purchaseDate)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            if (canUpdate || canArchive) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _AssetMenu(
+                canUpdate: canUpdate,
+                canArchive: canArchive,
+                onEdit: () => _showEditDialog(context),
+                onArchive: () => _showDeleteDialog(context),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -387,8 +483,19 @@ class _AssetListItem extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.xs),
                     _CategoryBadge(label: asset.category.label),
+                    if (creatorName != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Created by $creatorName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -402,24 +509,32 @@ class _AssetListItem extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Purchase value', style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: AppSpacing.xs),
-          AmountText(amountText: formatEgpCurrency(asset.purchasePrice)),
           const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.xs,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _MetaText(
-                label: 'Purchased',
-                value: _formatDate(asset.purchaseDate),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Purchase value',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  AmountText(
+                    amountText: formatEgpCurrency(asset.purchasePrice),
+                  ),
+                ],
               ),
-              _MetaText(label: 'Category', value: asset.category.label),
+              Text(
+                'Purchased ${_formatDate(asset.purchaseDate)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
           if (note != null && note.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               note,
               maxLines: 2,
@@ -548,23 +663,6 @@ class _CategoryBadge extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MetaText extends StatelessWidget {
-  const _MetaText({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$label: $value',
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.bodySmall,
     );
   }
 }

@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_layout.dart';
+import '../../../core/theme/app_radius.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/app_overlays.dart';
 import '../application/business_providers.dart';
 import '../domain/business_workspace.dart';
 import 'create_business_dialog.dart';
 
 class CurrentBusinessEntry extends ConsumerWidget {
-  const CurrentBusinessEntry({super.key});
+  const CurrentBusinessEntry({this.canSwitch = true, super.key});
+
+  final bool canSwitch;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,60 +21,101 @@ class CurrentBusinessEntry extends ConsumerWidget {
     final mutation = ref.watch(workspaceMutationControllerProvider);
     final currentBusiness = resolution.value?.selectedWorkspace;
     final busy = mutation.isLoading;
+    final colors = Theme.of(context).colorScheme;
+    final isInteractive = canSwitch && !busy && currentBusiness != null;
 
     return Semantics(
-      button: currentBusiness != null,
+      button: isInteractive,
       label: currentBusiness == null
           ? 'Current Business loading'
-          : 'Switch Current Business. Currently ${currentBusiness.businessName}',
-      child: AppCard(
-        padding: EdgeInsets.zero,
-        onTap: busy || currentBusiness == null
-            ? null
-            : () => _showBusinessSwitcher(context),
-        child: ListTile(
-          dense: true,
-          leading: const Icon(Icons.business_outlined),
-          title: Text(
-            currentBusiness?.businessName ?? 'Current Business',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          : canSwitch
+          ? 'Switch Current Business. Currently ${currentBusiness.businessName}'
+          : 'Current Business: ${currentBusiness.businessName}',
+      child: Material(
+        color: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadius.borderLg,
+          side: BorderSide(color: colors.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isInteractive
+              ? () => showBusinessSwitcherSheet(context)
+              : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AppControlHeight.large,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.business_outlined,
+                    size: AppIconSize.standard,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentBusiness?.businessName ?? 'Current Business',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        Text(
+                          currentBusiness?.roleName ??
+                              (resolution.hasError
+                                  ? 'Business unavailable'
+                                  : 'Loading...'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (canSwitch) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    if (busy)
+                      const SizedBox.square(
+                        dimension: AppIconSize.small,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      Icon(
+                        Icons.expand_more_rounded,
+                        size: AppIconSize.standard,
+                        color: colors.onSurfaceVariant,
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          subtitle: Text(
-            currentBusiness?.roleName ??
-                (resolution.hasError ? 'Business unavailable' : 'Loading...'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: busy
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.expand_more_rounded),
         ),
       ),
     );
   }
+}
 
-  Future<void> _showBusinessSwitcher(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            0,
-            AppSpacing.lg,
-            AppSpacing.xl,
-          ),
-          child: const WorkspaceSwitcherCard(closeAfterSelection: true),
-        ),
-      ),
-    );
-  }
+Future<void> showBusinessSwitcherSheet(BuildContext context) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: false,
+    builder: (context) => const AppBottomSheetShell(
+      title: 'Switch Business',
+      child: WorkspaceSwitcherCard(closeAfterSelection: true),
+    ),
+  );
 }
 
 class WorkspaceSwitcherCard extends ConsumerWidget {

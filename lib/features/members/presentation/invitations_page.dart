@@ -39,7 +39,7 @@ class InvitationsPage extends ConsumerWidget {
           padding: AppBottomNavSpacer.listPadding(context),
           children: [
             const PageHeader(
-              title: 'Invitations to your account',
+              title: 'Received invitations',
               subtitle: 'Business invitations sent to your verified email.',
             ),
             const SizedBox(height: AppSpacing.xl),

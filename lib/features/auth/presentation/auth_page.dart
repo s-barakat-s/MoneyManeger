@@ -1258,24 +1258,6 @@ class _AuthScaffold extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned(
-            top: -110,
-            right: -90,
-            child: _BackgroundOrb(
-              size: 300,
-              color: AppColors.primary,
-              opacity: 0.12,
-            ),
-          ),
-          const Positioned(
-            bottom: -130,
-            left: -110,
-            child: _BackgroundOrb(
-              size: 330,
-              color: AppColors.info,
-              opacity: 0.08,
-            ),
-          ),
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -1309,7 +1291,7 @@ class _AuthScaffold extends StatelessWidget {
                               ),
                             )
                           else
-                            const SizedBox(height: 48),
+                            const SizedBox(height: AppSpacing.lg),
                           SizedBox(
                             height: compact ? AppSpacing.sm : AppSpacing.md,
                           ),

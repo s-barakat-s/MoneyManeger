@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_layout.dart';
+
 class ResponsiveDialogContent extends StatelessWidget {
   const ResponsiveDialogContent({
     required this.child,
-    this.maxWidth = 420,
+    this.maxWidth = AppContentWidth.dialog,
     this.maxHeightFactor = 0.72,
     super.key,
   });

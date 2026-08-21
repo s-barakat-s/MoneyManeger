@@ -69,7 +69,7 @@ class AccountAuthenticationMethodSheet extends StatelessWidget {
             AppButton(
               label: 'Use password',
               icon: Icons.password_rounded,
-              variant: AppButtonVariant.outlined,
+              variant: AppButtonVariant.secondary,
               onPressed: () => Navigator.of(
                 context,
               ).pop(AccountAuthenticationMethod.password),
@@ -77,7 +77,7 @@ class AccountAuthenticationMethodSheet extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             AppButton(
               label: 'Cancel',
-              variant: AppButtonVariant.text,
+              variant: AppButtonVariant.tertiary,
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -249,7 +249,7 @@ class _SavedPasswordAccountAuthSheetState
                 const SizedBox(height: AppSpacing.xs),
                 AppButton(
                   label: 'Cancel',
-                  variant: AppButtonVariant.text,
+                  variant: AppButtonVariant.tertiary,
                   onPressed: _submitting
                       ? null
                       : () {

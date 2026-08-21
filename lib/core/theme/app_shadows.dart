@@ -3,11 +3,23 @@ import 'package:flutter/material.dart';
 class AppShadows {
   const AppShadows._();
 
-  static const soft = [
-    BoxShadow(color: Color(0x0F1D1B2A), blurRadius: 22, offset: Offset(0, 10)),
+  /// Default separation for raised surfaces in light mode.
+  static const subtle = [
+    BoxShadow(color: Color(0x121D1B20), blurRadius: 16, offset: Offset(0, 4)),
   ];
 
-  static const medium = [
-    BoxShadow(color: Color(0x171D1B2A), blurRadius: 32, offset: Offset(0, 16)),
+  /// Reserved for menus, dialogs, and other temporary overlays.
+  static const overlay = [
+    BoxShadow(color: Color(0x241D1B20), blurRadius: 28, offset: Offset(0, 12)),
   ];
+
+  // Compatibility aliases for existing shared components during migration.
+  static const soft = subtle;
+  static const medium = overlay;
+}
+
+class AppElevation {
+  const AppElevation._();
+
+  static const double overlay = 3;
 }

@@ -3,25 +3,27 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
-  static const primary = Color(0xFF6C2BFF);
-  static const primaryDark = Color(0xFF4C1FD1);
-  static const primaryLight = Color(0xFFEDE5FF);
-  static const background = Color(0xFFF8F8FC);
-  static const surface = Color(0xFFFFFFFF);
-  static const surfaceSoft = Color(0xFFF4F1FA);
-  static const textPrimary = Color(0xFF1D1B2A);
-  static const textSecondary = Color(0xFF7D7A8C);
-  static const border = Color(0xFFECEAF3);
-  static const success = Color(0xFF1DBE73);
-  static const danger = Color(0xFFF04D5E);
-  static const warning = Color(0xFFFFB547);
+  // Brand purple is chromatic and authoritative while remaining limited to
+  // interactive and intentional brand moments.
+  static const primary = Color(0xFF6336D1);
+  static const primaryDark = Color(0xFF45209C);
+  static const primaryLight = Color(0xFFEAE2FF);
+  static const background = Color(0xFFF6F7F9);
+  static const surface = Color(0xFFFFFEFF);
+  static const surfaceSoft = Color(0xFFEEF0F3);
+  static const textPrimary = Color(0xFF17151B);
+  static const textSecondary = Color(0xFF514D57);
+  static const border = Color(0xFFD9DCE3);
+  static const success = Color(0xFF087A4B);
+  static const danger = Color(0xFFB4232C);
+  static const warning = Color(0xFF9A5B00);
   static const purple = primary;
-  static const info = Color(0xFF4C8DFF);
+  static const info = Color(0xFF1769AA);
 
-  static const darkBackground = Color(0xFF11101A);
-  static const darkSurface = Color(0xFF1B1926);
-  static const darkSurfaceSoft = Color(0xFF242135);
-  static const darkTextPrimary = Color(0xFFF5F3FF);
-  static const darkTextSecondary = Color(0xFFB6B1C8);
-  static const darkBorder = Color(0xFF302B45);
+  static const darkBackground = Color(0xFF121116);
+  static const darkSurface = Color(0xFF1B1A20);
+  static const darkSurfaceSoft = Color(0xFF242229);
+  static const darkTextPrimary = Color(0xFFE7E1E9);
+  static const darkTextSecondary = Color(0xFFC9C3CE);
+  static const darkBorder = Color(0xFF49454F);
 }

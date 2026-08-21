@@ -17,6 +17,7 @@ import { handleInvitationRoute } from "./routes/invitations.ts";
 import { handleMemberRoute } from "./routes/members.ts";
 import { handleActivityRoute } from "./routes/activity.ts";
 import { handleTransactionActorRoute } from "./routes/transaction_actors.ts";
+import { handleActorNamesRoute } from "./routes/actor_names.ts";
 
 const allowedOrigins = new Set(
   (Deno.env.get("ALLOWED_ORIGINS") ?? "")
@@ -105,6 +106,14 @@ Deno.serve(async (request) => {
     );
     if (transactionActorResult !== null) {
       return success(transactionActorResult, corsHeaders);
+    }
+    const actorNamesResult = await handleActorNamesRoute(
+      request,
+      pathname,
+      identity,
+    );
+    if (actorNamesResult !== null) {
+      return success(actorNamesResult, corsHeaders);
     }
     throw new ApiError(404, "not-found", "Not found.");
   } catch (error) {

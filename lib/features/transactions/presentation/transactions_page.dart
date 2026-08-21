@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -433,6 +434,105 @@ class _TransactionsList extends StatelessWidget {
             : actorNames[creatorUid] ??
                   (actorNamesLoading ? 'Loading creator...' : 'Unknown member');
 
+        final isDesktop =
+            MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+        if (isDesktop) {
+          return AppCard(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            onTap: () =>
+                context.push(transactionDetailsLocation(transaction.id)),
+            child: Row(
+              children: [
+                _LedgerIcon(icon: _iconForType(transaction.type), color: color),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_labelForType(transaction.type)} · $ownerName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatDate(transaction.date),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Created by $creatorName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                AmountText(
+                  amountText:
+                      '${isIncome ? '+' : '-'}${formatEgpCurrency(transaction.amount)}',
+                  variant: isIncome
+                      ? AmountTextVariant.income
+                      : AmountTextVariant.expense,
+                ),
+                if (canUpdate || canArchive) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  PopupMenuButton<_TransactionAction>(
+                    tooltip: 'More actions',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (action) {
+                      if (action == _TransactionAction.edit) {
+                        _showEditDialog(context, transaction);
+                      } else {
+                        _showDeleteDialog(context, transaction);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      if (canUpdate)
+                        const PopupMenuItem(
+                          value: _TransactionAction.edit,
+                          child: Text('Edit'),
+                        ),
+                      if (canArchive)
+                        const PopupMenuItem(
+                          value: _TransactionAction.archive,
+                          child: Text('Archive'),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
+        }
+
         return AppCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
           onTap: () => context.push(transactionDetailsLocation(transaction.id)),
@@ -452,7 +552,7 @@ class _TransactionsList extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      '${_labelForType(transaction.type)} - $ownerName - ${_formatDate(transaction.date)}',
+                      '${_labelForType(transaction.type)} · $ownerName · ${_formatDate(transaction.date)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,

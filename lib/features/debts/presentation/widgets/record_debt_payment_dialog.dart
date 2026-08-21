@@ -2,13 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/models/debt.dart';
 import '../../../../core/utils/readable_date_formatter.dart';
-import '../../../../shared/models/owner.dart';
+import '../../../../shared/models/debt.dart';
 import '../../../../shared/models/debt_payment.dart';
+import '../../../../shared/models/owner.dart';
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../../business/application/business_access_providers.dart';
 import '../../../business/domain/permission.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
@@ -64,7 +64,7 @@ class _RecordDebtPaymentDialogState
     final ownersAsync = ref.watch(ownersStreamProvider);
 
     return AdaptiveFinancialFormDialog(
-      title: Text(_dialogTitle),
+      title: _dialogTitle,
       canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
@@ -87,85 +87,67 @@ class _RecordDebtPaymentDialogState
 
           _initializeOwner(owners);
 
-          return ResponsiveDialogContent(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: _amountController,
-                    autofocus: true,
-                    decoration: amountInputDecoration(_amountLabel),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: decimalAmountInputFormatters,
-                    validator: (value) {
-                      final amount = double.tryParse(value?.trim() ?? '');
-                      if (amount == null || amount <= 0) {
-                        return 'Enter an amount greater than 0';
-                      }
-                      if (amount > widget.remainingAmount) {
-                        return 'Amount cannot exceed the remaining ${_isCollection ? 'receivable' : 'debt'}';
-                      }
-
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    key: ValueKey(_ownerId),
-                    initialValue: _ownerId,
-                    decoration: InputDecoration(labelText: _ownerFieldLabel),
-                    items: [
-                      for (final owner in owners)
-                        DropdownMenuItem(
-                          value: owner.id,
-                          child: Text(
-                            owner.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+          return Form(
+            key: _formKey,
+            child: AppFormColumn(
+              children: [
+                AppMoneyField(
+                  controller: _amountController,
+                  autofocus: true,
+                  label: 'Amount',
+                  inputFormatters: decimalAmountInputFormatters,
+                  validator: (value) {
+                    final amount = double.tryParse(value?.trim() ?? '');
+                    if (amount == null || amount <= 0) {
+                      return 'Enter an amount greater than 0';
+                    }
+                    if (amount > widget.remainingAmount) {
+                      return 'Amount cannot exceed the remaining ${_isCollection ? 'receivable' : 'debt'}';
+                    }
+                    return null;
+                  },
+                ),
+                AppSelectField<String>(
+                  label: 'Money Holder',
+                  value: _ownerId,
+                  items: [
+                    for (final owner in owners)
+                      DropdownMenuItem(
+                        value: owner.id,
+                        child: Text(
+                          owner.name,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                    ],
-                    onChanged: (value) => setState(() => _ownerId = value),
-                    validator: (value) =>
-                        value == null ? 'Select a money holder' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DialogDateField(
-                    label: _dateLabel,
-                    value: _formatDate(_date),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _date,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-
-                      if (picked != null) {
-                        setState(() => _date = picked);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _noteController,
-                    decoration: const InputDecoration(labelText: 'Note'),
-                    maxLines: 3,
-                  ),
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
                       ),
-                    ),
                   ],
-                ],
-              ),
+                  onChanged: (value) => setState(() => _ownerId = value),
+                  validator: (value) =>
+                      value == null ? 'Select a money holder' : null,
+                ),
+                AppDateField(
+                  label: 'Date',
+                  value: _formatDate(_date),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+
+                    if (picked != null) {
+                      setState(() => _date = picked);
+                    }
+                  },
+                ),
+                AppTextArea(
+                  controller: _noteController,
+                  label: 'Note',
+                  hintText: 'Optional note or reference',
+                ),
+                if (_errorMessage != null)
+                  FinancialFormError(message: _errorMessage!),
+              ],
             ),
           );
         },
@@ -179,7 +161,7 @@ class _RecordDebtPaymentDialogState
       ),
       actions: [
         DialogFormActions(
-          primaryLabel: _isCollection ? 'Record collection' : 'Record payment',
+          primaryLabel: _isCollection ? 'Collect' : 'Pay',
           onPrimaryPressed: _isSaving || ownersAsync.value?.isEmpty != false
               ? null
               : _save,
@@ -266,18 +248,6 @@ class _RecordDebtPaymentDialogState
     }
 
     return widget.prefillAmount == null ? 'Record payment' : 'Mark paid';
-  }
-
-  String get _ownerFieldLabel {
-    return _isCollection ? 'Received by' : 'Paid by';
-  }
-
-  String get _amountLabel {
-    return _isCollection ? 'Collection amount' : 'Payment amount';
-  }
-
-  String get _dateLabel {
-    return _isCollection ? 'Collection date' : 'Payment date';
   }
 
   String _formatDate(DateTime value) {

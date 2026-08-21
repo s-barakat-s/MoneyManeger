@@ -40,18 +40,18 @@ class WorkspaceOnboardingPage extends ConsumerWidget {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680),
+            constraints: const BoxConstraints(maxWidth: 560),
             child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.xl),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               children: [
                 Text(
-                  'Business setup',
+                  'Choose a Business',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'Open a Business you belong to, accept an invitation, or '
-                  'create a new Business.',
+                  'Open an existing Business, accept an invitation, or create '
+                  'a new Business.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 if (resolution.workspaces.isNotEmpty) ...[

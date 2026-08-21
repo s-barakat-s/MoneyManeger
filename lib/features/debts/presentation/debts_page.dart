@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -20,6 +21,7 @@ import '../../../shared/widgets/home_summary_hero.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../application/debt_providers.dart';
 import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_actor_name_providers.dart';
 import '../../business/domain/permission.dart';
 import 'debt_stream_providers.dart';
 import 'widgets/add_debt_dialog.dart';
@@ -463,6 +465,16 @@ class _DebtListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final creatorUid = debt.audit.createdBy;
+    final actorNamesAsync = creatorUid == null
+        ? null
+        : ref.watch(actorNamesProvider(creatorUid));
+    final creatorName = creatorUid == null
+        ? null
+        : !actorNamesAsync!.hasValue
+        ? null
+        : actorNamesAsync.value?[creatorUid] ??
+              'Unknown member';
     final remainingAmount = (debt.totalAmount - debt.paidAmount)
         .clamp(0, double.infinity)
         .toDouble();
@@ -471,6 +483,148 @@ class _DebtListItem extends ConsumerWidget {
     final isActive = debt.status == DebtStatus.active;
     final canRestore =
         debt.status == DebtStatus.archived && remainingAmount > 0;
+
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+    final actionWidget = isActive && canUpdate
+        ? (isDesktop
+              ? OutlinedButton.icon(
+                  onPressed: remainingAmount > 0
+                      ? () => _showPaymentDialog(context, debt, remainingAmount)
+                      : null,
+                  icon: const Icon(Icons.payments_outlined, size: 16),
+                  label: const Text('Pay'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                  ),
+                )
+              : FilledButton.icon(
+                  onPressed: remainingAmount > 0
+                      ? () => _showPaymentDialog(context, debt, remainingAmount)
+                      : null,
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Pay'),
+                ))
+        : (canRestore && canUpdate
+              ? OutlinedButton.icon(
+                  onPressed: () => _restoreDebt(context, ref),
+                  icon: const Icon(Icons.restore, size: 16),
+                  label: const Text('Restore'),
+                )
+              : const SizedBox.shrink());
+
+    if (isDesktop) {
+      return AppCard(
+        onTap: () => _showDetailsSheet(context, debt, remainingAmount),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            const _DebtIcon(icon: Icons.account_balance_rounded),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    debt.personName.isEmpty
+                        ? 'Unnamed creditor'
+                        : debt.personName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (debt.dueDate != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Due ${_formatDate(debt.dueDate!)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  if (creatorName != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Created by $creatorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _StatusBadge(status: status),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AmountText(
+                    amountText: formatEgpCurrency(remainingAmount),
+                    variant: AmountTextVariant.expense,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Paid ${formatEgpCurrency(debt.paidAmount)} of ${formatEgpCurrency(debt.totalAmount)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            SizedBox(
+              width: 100,
+              child: ClipRRect(
+                borderRadius: AppRadius.borderSm,
+                child: LinearProgressIndicator(
+                  minHeight: 6,
+                  value: progress,
+                  backgroundColor: AppColors.danger.withValues(alpha: 0.12),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.danger,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            actionWidget,
+            if (canUpdate || canArchive) ...[
+              const SizedBox(width: AppSpacing.sm),
+              _DebtMenu(
+                debt: debt,
+                canUpdate: canUpdate,
+                canArchive: canArchive,
+                onEdit: () => _showEditDialog(context, debt),
+                onArchive: () => _showDeleteDialog(context, debt),
+                onMarkPaid: canUpdate && remainingAmount > 0
+                    ? () => _showPaymentDialog(
+                        context,
+                        debt,
+                        remainingAmount,
+                        prefillAmount: remainingAmount,
+                      )
+                    : null,
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return AppCard(
       onTap: () => _showDetailsSheet(context, debt, remainingAmount),
@@ -484,13 +638,29 @@ class _DebtListItem extends ConsumerWidget {
               const _DebtIcon(icon: Icons.account_balance_rounded),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: Text(
-                  debt.personName.isEmpty
-                      ? 'Unnamed creditor'
-                      : debt.personName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      debt.personName.isEmpty
+                          ? 'Unnamed creditor'
+                          : debt.personName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (creatorName != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Created by $creatorName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -513,31 +683,14 @@ class _DebtListItem extends ConsumerWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           Text('Remaining', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSpacing.xs),
           AmountText(
             amountText: formatEgpCurrency(remainingAmount),
             variant: AmountTextVariant.expense,
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _MetaText(
-                label: 'Total',
-                value: formatEgpCurrency(debt.totalAmount),
-              ),
-              _MetaText(
-                label: 'Paid',
-                value: formatEgpCurrency(debt.paidAmount),
-              ),
-              if (debt.dueDate != null)
-                _MetaText(label: 'Due', value: _formatDate(debt.dueDate!)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           ClipRRect(
             borderRadius: AppRadius.borderSm,
             child: LinearProgressIndicator(
@@ -547,26 +700,25 @@ class _DebtListItem extends ConsumerWidget {
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.danger),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Paid ${formatEgpCurrency(debt.paidAmount)} of ${formatEgpCurrency(debt.totalAmount)}',
-            style: Theme.of(context).textTheme.bodySmall,
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Paid ${formatEgpCurrency(debt.paidAmount)} of ${formatEgpCurrency(debt.totalAmount)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (debt.dueDate != null)
+                Text(
+                  'Due ${_formatDate(debt.dueDate!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (isActive && canUpdate)
-            FilledButton.icon(
-              onPressed: remainingAmount > 0
-                  ? () => _showPaymentDialog(context, debt, remainingAmount)
-                  : null,
-              icon: const Icon(Icons.payments_outlined),
-              label: const Text('Pay'),
-            )
-          else if (canRestore && canUpdate)
-            FilledButton.icon(
-              onPressed: () => _restoreDebt(context, ref),
-              icon: const Icon(Icons.restore),
-              label: const Text('Restore to Active'),
-            ),
+          if (isActive && canUpdate || canRestore && canUpdate) ...[
+            const SizedBox(height: AppSpacing.md),
+            actionWidget,
+          ],
         ],
       ),
     );

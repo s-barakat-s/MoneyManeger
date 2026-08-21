@@ -12,6 +12,28 @@ class HttpBusinessActorIdentityRepository
   final AuthenticatedBackendClient _backend;
 
   @override
+  Future<Map<String, String>> resolveActorNames({
+    required String businessId,
+    required Iterable<String> actorUids,
+  }) async {
+    final uids = actorUids.where((uid) => uid.isNotEmpty).toSet().toList();
+    final actors = <String, String>{};
+    for (var offset = 0; offset < uids.length; offset += _batchSize) {
+      final end = (offset + _batchSize).clamp(0, uids.length).toInt();
+      final data = await _backend.post(
+        '/api/businesses/${Uri.encodeComponent(businessId)}/actor-names/resolve',
+        body: {'actorUids': uids.sublist(offset, end)},
+      );
+      for (final actor in _mapList(data['actors'])) {
+        final uid = _requiredString(actor, 'uid');
+        final name = _requiredString(actor, 'name').trim();
+        actors[uid] = name.isEmpty ? 'Unknown member' : name;
+      }
+    }
+    return Map.unmodifiable(actors);
+  }
+
+  @override
   Future<Map<String, String>> resolveTransactionActors({
     required String businessId,
     required Iterable<String> transactionIds,

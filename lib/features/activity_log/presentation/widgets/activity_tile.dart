@@ -15,15 +15,21 @@ class ActivityTile extends StatelessWidget {
     final description = _description(entry.action);
     final detail = _safeDetail(entry);
     return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: Icon(
-              _icon(entry.action),
-              color: Theme.of(context).colorScheme.primary,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: SizedBox.square(
+              dimension: 40,
+              child: Icon(
+                _icon(entry.action),
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -32,11 +38,9 @@ class ActivityTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  entry.actorName ?? 'Unknown member',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  '${entry.actorName ?? 'Unknown member'} · $description',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(description),
                 if (detail != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(detail, style: Theme.of(context).textTheme.bodySmall),

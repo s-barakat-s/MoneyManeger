@@ -2,12 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/models/owner.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/readable_date_formatter.dart';
+import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/transfer.dart';
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../../business/application/business_access_providers.dart';
 import '../../../business/domain/permission.dart';
 import '../../../owners/presentation/owner_stream_providers.dart';
@@ -50,7 +51,7 @@ class _AddTransferDialogState extends ConsumerState<AddTransferDialog> {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
     return AdaptiveFinancialFormDialog(
-      title: const Text('Transfer money'),
+      title: 'Transfer money',
       canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
@@ -198,97 +199,97 @@ class _TransferForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveDialogContent(
-      child: Form(
-        key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<String>(
-              key: ValueKey(fromOwnerId),
-              initialValue: fromOwnerId,
-              decoration: const InputDecoration(labelText: 'From money holder'),
-              items: _ownerItems(),
-              onChanged: onFromOwnerChanged,
-              validator: (value) {
-                if (value == null) {
-                  return 'Select the sending money holder';
-                }
-                if (value == toOwnerId) {
-                  return 'Money holders must be different';
-                }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTwoColumn = constraints.maxWidth >= 460;
+        final fromField = AppSelectField<String>(
+          label: 'From',
+          value: fromOwnerId,
+          items: _ownerItems(),
+          onChanged: onFromOwnerChanged,
+          validator: (value) {
+            if (value == null) {
+              return 'Select the sending money holder';
+            }
+            if (value == toOwnerId) {
+              return 'Money holders must be different';
+            }
+            return null;
+          },
+        );
 
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: ValueKey(toOwnerId),
-              initialValue: toOwnerId,
-              decoration: const InputDecoration(labelText: 'To money holder'),
-              items: _ownerItems(),
-              onChanged: onToOwnerChanged,
-              validator: (value) {
-                if (value == null) {
-                  return 'Select the receiving money holder';
-                }
-                if (value == fromOwnerId) {
-                  return 'Money holders must be different';
-                }
+        final toField = AppSelectField<String>(
+          label: 'To',
+          value: toOwnerId,
+          items: _ownerItems(),
+          onChanged: onToOwnerChanged,
+          validator: (value) {
+            if (value == null) {
+              return 'Select the receiving money holder';
+            }
+            if (value == fromOwnerId) {
+              return 'Money holders must be different';
+            }
+            return null;
+          },
+        );
 
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: amountController,
-              decoration: amountInputDecoration('Amount'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+        return Form(
+          key: formKey,
+          child: AppFormColumn(
+            children: [
+              if (isTwoColumn)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: fromField),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(child: toField),
+                  ],
+                )
+              else ...[
+                fromField,
+                toField,
+              ],
+              AppMoneyField(
+                label: 'Amount',
+                controller: amountController,
+                inputFormatters: decimalAmountInputFormatters,
+                validator: (value) {
+                  final amount = double.tryParse(value?.trim() ?? '');
+                  if (amount == null || amount <= 0) {
+                    return 'Enter an amount greater than 0';
+                  }
+                  return null;
+                },
               ),
-              inputFormatters: decimalAmountInputFormatters,
-              validator: (value) {
-                final amount = double.tryParse(value?.trim() ?? '');
-                if (amount == null || amount <= 0) {
-                  return 'Enter an amount greater than 0';
-                }
+              AppDateField(
+                label: 'Date',
+                value: _formatDate(date),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2100),
+                  );
 
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            DialogDateField(
-              label: 'Date',
-              value: _formatDate(date),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: date,
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
-                );
-
-                if (picked != null) {
-                  onDateChanged(picked);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: noteController,
-              decoration: const InputDecoration(labelText: 'Note'),
-              maxLines: 3,
-            ),
-            if (errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  if (picked != null) {
+                    onDateChanged(picked);
+                  }
+                },
               ),
+              AppTextArea(
+                label: 'Note',
+                controller: noteController,
+                hintText: 'Optional note or reference',
+              ),
+              if (errorMessage != null)
+                FinancialFormError(message: errorMessage!),
             ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

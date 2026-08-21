@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/application/auth_providers.dart';
 import '../../features/business/application/business_providers.dart';
+import '../../core/theme/app_layout.dart';
+import '../../core/theme/app_spacing.dart';
+import 'app_button.dart';
+import 'app_overlays.dart';
 
 const financialContextChangedMessage =
     'The current Business changed while this form was open. Close it and '
@@ -57,11 +61,12 @@ class FinancialFormLoadError extends StatelessWidget {
             'Could not load the information needed for this form.',
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: 'Try again',
+            icon: Icons.refresh_rounded,
+            variant: AppButtonVariant.secondary,
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Try again'),
           ),
         ],
       ),
@@ -84,17 +89,36 @@ class FinancialPrecondition extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 360),
+      constraints: const BoxConstraints(maxWidth: AppContentWidth.compact),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(message),
           if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 16),
-            FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
+            const SizedBox(height: AppSpacing.lg),
+            AppButton(label: actionLabel!, onPressed: onAction),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class FinancialFormError extends StatelessWidget {
+  const FinancialFormError({required this.message, super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.error,
+        ),
       ),
     );
   }
@@ -106,39 +130,49 @@ class AdaptiveFinancialFormDialog extends StatelessWidget {
     required this.content,
     required this.actions,
     this.canDismiss = true,
+    this.maxWidth = AppContentWidth.form,
+    this.onClose,
     super.key,
   });
 
-  final Widget title;
+  final String title;
   final Widget content;
   final List<Widget> actions;
   final bool canDismiss;
+  final double maxWidth;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.compact;
+
+    final resolvedActions = actions.length == 1
+        ? actions.first
+        : (isDesktop
+              ? Row(mainAxisAlignment: MainAxisAlignment.end, children: actions)
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: actions,
+                ));
+
     final Widget dialog;
-    if (MediaQuery.sizeOf(context).width >= 600) {
-      dialog = AlertDialog(
-        scrollable: true,
-        title: title,
-        content: content,
-        actions: actions,
+    if (isDesktop) {
+      dialog = AppDialogShell(
+        maxWidth: maxWidth,
+        title: Text(title),
+        body: content,
+        actions: resolvedActions,
       );
     } else {
-      dialog = Dialog.fullscreen(
-        child: Scaffold(
-          appBar: AppBar(automaticallyImplyLeading: false, title: title),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Align(alignment: Alignment.topCenter, child: content),
-            ),
-          ),
-          bottomNavigationBar: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-            child: Column(mainAxisSize: MainAxisSize.min, children: actions),
-          ),
-        ),
+      dialog = AppMobileFormCard(
+        title: title,
+        body: content,
+        actions: resolvedActions,
+        canClose: canDismiss,
+        onClose: onClose ?? () => Navigator.of(context).pop(false),
+        maxWidth: maxWidth,
       );
     }
 

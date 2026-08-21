@@ -3,13 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme_tokens.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/readable_date_formatter.dart';
 import '../../../shared/models/audit_metadata.dart';
 import '../../../shared/models/transaction.dart' as money;
-import '../../../shared/widgets/amount_text.dart';
 import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/app_status.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/app_shell.dart';
@@ -79,37 +81,41 @@ class _TransactionDetailsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isIncome = transaction.type == money.TransactionType.income;
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isIncome ? 'Income' : 'Expense',
-                style: Theme.of(context).textTheme.titleMedium,
+    final tokens = context.appTheme;
+    final textTheme = Theme.of(context).textTheme;
+    final note = transaction.note?.trim();
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppContentWidth.form),
+        child: ListView(
+          padding: AppLayout.pagePaddingFor(MediaQuery.sizeOf(context).width),
+          children: [
+            AppStatusChip(
+              label: isIncome ? 'Income' : 'Expense',
+              tone: isIncome ? AppStatusTone.success : AppStatusTone.danger,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              '${isIncome ? '+' : '-'}${formatEgpCurrency(transaction.amount)}',
+              style: textTheme.headlineMedium?.copyWith(
+                color: isIncome ? tokens.income : tokens.expense,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              AmountText(
-                amountText:
-                    '${isIncome ? '+' : '-'}${formatEgpCurrency(transaction.amount)}',
-                variant: isIncome
-                    ? AmountTextVariant.income
-                    : AmountTextVariant.expense,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _DetailRow(label: 'Money holder', value: ownerName),
-              _DetailRow(label: 'Date', value: _formatDate(transaction.date)),
-              if (transaction.note?.trim() case final note?
-                  when note.isNotEmpty)
-                _DetailRow(label: 'Note', value: note),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            Text('Details', style: textTheme.titleSmall),
+            const SizedBox(height: AppSpacing.md),
+            _DetailRow(label: 'Money Holder', value: ownerName),
+            _DetailRow(label: 'Date', value: _formatDate(transaction.date)),
+            if (note != null && note.isNotEmpty)
+              _DetailRow(label: 'Note', value: note),
+            const SizedBox(height: AppSpacing.xl),
+            _AuditSection(audit: transaction.audit, actorNames: actorNames),
+          ],
         ),
-        const SizedBox(height: AppSpacing.lg),
-        _AuditCard(audit: transaction.audit, actorNames: actorNames),
-      ],
+      ),
     );
   }
 }
@@ -124,8 +130,8 @@ money.Transaction? _findTransaction(
   return null;
 }
 
-class _AuditCard extends StatelessWidget {
-  const _AuditCard({required this.audit, required this.actorNames});
+class _AuditSection extends StatelessWidget {
+  const _AuditSection({required this.audit, required this.actorNames});
 
   final AuditMetadata audit;
   final AsyncValue<Map<String, String>> actorNames;
@@ -133,34 +139,40 @@ class _AuditCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final showUpdater = _hasMeaningfulUpdate(audit);
+    final tokens = context.appTheme;
 
     return AppCard(
+      variant: AppCardVariant.subtle,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.history_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text('Audit', style: Theme.of(context).textTheme.titleMedium),
-            ],
+          Text(
+            'Audit',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(color: tokens.textMuted),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          _AuditLine(
+          const SizedBox(height: AppSpacing.md),
+          _DetailRow(
             label: 'Created by',
-            name: _resolvedName(audit.createdBy),
-            timestamp: audit.createdAt,
+            value: _resolvedName(audit.createdBy),
           ),
-          if (showUpdater) ...[
-            const SizedBox(height: AppSpacing.md),
-            _AuditLine(
-              label: 'Last updated by',
-              name: _resolvedName(audit.updatedBy),
-              timestamp: audit.updatedAt,
+          if (audit.createdAt != null)
+            _DetailRow(
+              label: 'Created',
+              value: _formatDateTime(audit.createdAt!),
             ),
+          if (showUpdater) ...[
+            _DetailRow(
+              label: 'Updated by',
+              value: _resolvedName(audit.updatedBy),
+            ),
+            if (audit.updatedAt != null)
+              _DetailRow(
+                label: 'Updated',
+                value: _formatDateTime(audit.updatedAt!),
+              ),
           ],
         ],
       ),
@@ -177,37 +189,6 @@ class _AuditCard extends StatelessWidget {
   }
 }
 
-class _AuditLine extends StatelessWidget {
-  const _AuditLine({
-    required this.label,
-    required this.name,
-    required this.timestamp,
-  });
-
-  final String label;
-  final String name;
-  final DateTime? timestamp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$label $name', style: Theme.of(context).textTheme.bodyLarge),
-        if (timestamp != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            _formatDateTime(timestamp!),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 class _DetailRow extends StatelessWidget {
   const _DetailRow({required this.label, required this.value});
 
@@ -216,21 +197,29 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 112,
+          Expanded(
+            flex: 2,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
         ],
       ),
     );

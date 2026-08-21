@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -20,6 +21,7 @@ import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
 import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_actor_name_providers.dart';
 import '../../business/domain/permission.dart';
 import 'transfer_stream_providers.dart';
 import 'widgets/add_transfer_dialog.dart';
@@ -254,8 +256,7 @@ class _TransferFilterSheetState extends State<_TransferFilterSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AppFilterSheet(
+Widget build(BuildContext context) {    return AppFilterSheet(
       title: 'Filter transfers',
       onClear: widget.onClear,
       onApply: () => widget.onApply(_fromOwnerId, _toOwnerId),
@@ -317,7 +318,7 @@ class _MoneyHolderFilterDropdown extends StatelessWidget {
   }
 }
 
-class _TransfersList extends StatelessWidget {
+class _TransfersList extends ConsumerWidget {
   const _TransfersList({
     required this.transfers,
     required this.owners,
@@ -339,8 +340,7 @@ class _TransfersList extends StatelessWidget {
   final bool canArchive;
 
   @override
-  Widget build(BuildContext context) {
-    final ownerNames = {for (final owner in owners) owner.id: owner.name};
+Widget build(BuildContext context, WidgetRef ref) {    final ownerNames = {for (final owner in owners) owner.id: owner.name};
     final effectiveFromOwnerId = ownerNames.containsKey(selectedFromOwnerId)
         ? selectedFromOwnerId
         : null;
@@ -372,6 +372,15 @@ class _TransfersList extends StatelessWidget {
 
       return matchesSearch && matchesFrom && matchesTo;
     }).toList();
+    final actorUids = visibleTransfers
+        .map((transfer) => transfer.audit.createdBy)
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    final actorNamesAsync = ref.watch(actorNamesProvider(actorUids.join('|')));
+    final actorNames = actorNamesAsync.value ??
+        const <String, String>{};
 
     if (transfers.isEmpty) {
       return EmptyState(
@@ -412,7 +421,72 @@ class _TransfersList extends StatelessWidget {
         final transfer = visibleTransfers[index];
         final fromOwner = ownerNames[transfer.fromOwnerId] ?? 'Unknown owner';
         final toOwner = ownerNames[transfer.toOwnerId] ?? 'Unknown owner';
-        final note = transfer.note?.trim();
+        final creatorUid = transfer.audit.createdBy;
+        final creatorName = creatorUid == null
+            ? null
+            : !actorNamesAsync.hasValue
+            ? null
+            : actorNames[creatorUid] ?? 'Unknown member';
+        final note = [
+          transfer.note?.trim(),
+          if (creatorName != null) 'Created by $creatorName',
+        ].whereType<String>().where((value) => value.isNotEmpty).join('\n');
+
+        final isDesktop =
+            MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
+
+        if (isDesktop) {
+          return AppCard(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                const _TransferIcon(),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 3,
+                  child: _TransferDirection(
+                    fromOwner: fromOwner,
+                    toOwner: toOwner,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    note == null || note.isEmpty
+                        ? _formatTransferDate(transfer.date)
+                        : '${_formatTransferDate(transfer.date)} · $note',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                AmountText(
+                  amountText: formatEgpCurrency(transfer.amount),
+                  variant: AmountTextVariant.neutral,
+                ),
+                if (canArchive) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  PopupMenuButton<_TransferAction>(
+                    tooltip: 'More actions',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: (_) => _showDeleteDialog(context, transfer),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: _TransferAction.archive,
+                        child: Text('Archive'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          );
+        }
 
         return AppCard(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -425,11 +499,11 @@ class _TransfersList extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _TransferDirection(fromOwner: fromOwner, toOwner: toOwner),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       note == null || note.isEmpty
                           ? _formatTransferDate(transfer.date)
-                          : '${_formatTransferDate(transfer.date)} - $note',
+                          : '${_formatTransferDate(transfer.date)} · $note',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall,

@@ -25,7 +25,6 @@ import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/account_switcher_bottom_sheet.dart';
 import '../../business/application/business_access_providers.dart';
 import '../../business/domain/permission.dart';
-import '../../business/presentation/workspace_switcher_card.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({required this.currentLocation, super.key});
@@ -75,6 +74,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final appearanceMode = themeMode == ThemeMode.dark
+        ? ThemeMode.dark
+        : ThemeMode.light;
     final switchState = ref.watch(accountSwitchControllerProvider);
     final isSwitching = switchState is AccountSwitchLoading;
     final profile = ref.watch(userProfileProvider(widget.user.uid));
@@ -106,7 +108,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
         children: [
           const PageHeader(
             title: 'Settings',
-            subtitle: 'Manage your account, Current Business, and app.',
+            subtitle: 'Manage your account and app preferences.',
           ),
           const SizedBox(height: AppSpacing.xl),
           const _SectionTitle('Account'),
@@ -185,10 +187,10 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          const _SectionTitle('Business'),
-          const SizedBox(height: AppSpacing.sm),
-          const WorkspaceSwitcherCard(),
-          const SizedBox(height: AppSpacing.md),
+          if (canReadMembers || canReadActivity) ...[
+            const _SectionTitle('Business'),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (canReadMembers || canReadActivity)
             _SettingsCard(
               child: Column(
@@ -209,7 +211,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                       icon: Icons.history_rounded,
                       iconColor: AppColors.primary,
                       title: 'Business activity',
-                      subtitle: 'Review changes in the Current Business.',
+                      subtitle: 'Review Business changes and history.',
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => context.push(AppRoute.activity.path),
                     ),
@@ -224,9 +226,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
               icon: Icons.dark_mode_rounded,
               iconColor: AppColors.primary,
               title: 'Appearance',
-              subtitle: _themeModeLabel(themeMode),
+              subtitle: _themeModeLabel(appearanceMode),
               trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => _showThemeModeDialog(context, themeMode),
+              onTap: () => _showThemeModeDialog(context, appearanceMode),
             ),
           ),
         ],
@@ -304,7 +306,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final mode in ThemeMode.values)
+              for (final mode in [ThemeMode.light, ThemeMode.dark])
                 RadioListTile<ThemeMode>(
                   value: mode,
                   title: Text(_themeModeLabel(mode)),

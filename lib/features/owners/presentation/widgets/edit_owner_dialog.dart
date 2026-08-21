@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_layout.dart';
 import '../../../../shared/models/owner.dart';
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/owner_providers.dart';
 
 class EditOwnerDialog extends ConsumerStatefulWidget {
@@ -38,40 +39,31 @@ class _EditOwnerDialogState extends ConsumerState<EditOwnerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      title: const Text('Edit Money Holder'),
-      content: ResponsiveDialogContent(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Money Holder name',
-                ),
-                textInputAction: TextInputAction.done,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Name cannot be empty';
-                  }
-
-                  return null;
-                },
-                onFieldSubmitted: (_) => _save(),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ],
-            ],
-          ),
+    return AdaptiveFinancialFormDialog(
+      maxWidth: AppContentWidth.dialog,
+      title: 'Edit Money Holder',
+      canDismiss: !_isSaving,
+      content: Form(
+        key: _formKey,
+        child: AppFormColumn(
+          children: [
+            AppTextField(
+              controller: _nameController,
+              autofocus: true,
+              label: 'Money Holder name',
+              hintText: 'e.g. Main Safe, Bank Account, Cash Drawer',
+              textInputAction: TextInputAction.done,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Name cannot be empty';
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) => _save(),
+            ),
+            if (_errorMessage != null)
+              FinancialFormError(message: _errorMessage!),
+          ],
         ),
       ),
       actions: [

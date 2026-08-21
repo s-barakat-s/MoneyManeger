@@ -2,12 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/utils/readable_date_formatter.dart';
 import '../../../../shared/models/audit_metadata.dart';
 import '../../../../shared/models/debt.dart';
-import '../../../../core/utils/readable_date_formatter.dart';
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/debt_providers.dart';
 
 class AddDebtDialog extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
   DateTime? _dueDate;
   var _isSaving = false;
   String? _errorMessage;
+  String? _dueDateError;
   late final FinancialFormScopeGuard _scopeGuard;
 
   bool get _isEditing => widget.debt != null;
@@ -59,114 +61,115 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
   @override
   Widget build(BuildContext context) {
     return AdaptiveFinancialFormDialog(
-      title: Text(_dialogTitle),
+      title: _dialogTitle,
       canDismiss: !_isSaving,
-      content: ResponsiveDialogContent(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _personController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: widget.type == DebtType.weOwe
-                      ? 'Creditor name'
-                      : 'Debtor name',
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return widget.type == DebtType.weOwe
-                        ? 'Creditor name is required'
-                        : 'Debtor name is required';
-                  }
+      content: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTwoColumn = constraints.maxWidth >= 460;
+          final createdDateField = AppDateField(
+            label: 'Created date',
+            value: _formatDate(_createdAt),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _createdAt,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
 
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _amountController,
-                decoration: amountInputDecoration('Total amount'),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: decimalAmountInputFormatters,
-                validator: (value) {
-                  final amount = double.tryParse(value?.trim() ?? '');
-                  if (amount == null || amount <= 0) {
-                    return 'Enter a valid amount';
-                  }
-                  if (_isEditing && amount < widget.debt!.paidAmount) {
-                    return 'Total amount cannot be less than paid amount';
-                  }
+              if (picked != null) {
+                setState(() => _createdAt = picked);
+              }
+            },
+          );
 
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              DialogDateField(
-                label: 'Created date',
-                value: _formatDate(_createdAt),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _createdAt,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
+          final dueDateField = AppDateField(
+            label: 'Due date',
+            value: _dueDate == null ? 'Not set' : _formatDate(_dueDate!),
+            errorText: _dueDateError,
+            trailing: _dueDate != null
+                ? IconButton(
+                    tooltip: 'Clear due date',
+                    onPressed: () => setState(() {
+                      _dueDate = null;
+                      _dueDateError = null;
+                    }),
+                    icon: const Icon(Icons.close_rounded),
+                  )
+                : null,
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _dueDate ?? _createdAt,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
 
-                  if (picked != null) {
-                    setState(() => _createdAt = picked);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              DialogDateField(
-                label: 'Due date',
-                value: _dueDate == null ? 'Not set' : _formatDate(_dueDate!),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_dueDate != null)
-                      IconButton(
-                        tooltip: 'Clear due date',
-                        onPressed: () => setState(() => _dueDate = null),
-                        icon: const Icon(Icons.close),
-                      ),
-                    const Icon(Icons.calendar_today_outlined),
-                  ],
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _dueDate ?? _createdAt,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
+              if (picked != null) {
+                setState(() {
+                  _dueDate = picked;
+                  _dueDateError = null;
+                });
+              }
+            },
+          );
 
-                  if (picked != null) {
-                    setState(() => _dueDate = picked);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Note'),
-                maxLines: 3,
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+          return Form(
+            key: _formKey,
+            child: AppFormColumn(
+              children: [
+                AppTextField(
+                  controller: _personController,
+                  autofocus: true,
+                  label: widget.type == DebtType.weOwe ? 'Creditor' : 'Debtor',
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return widget.type == DebtType.weOwe
+                          ? 'Creditor name is required'
+                          : 'Debtor name is required';
+                    }
+                    return null;
+                  },
                 ),
+                AppMoneyField(
+                  controller: _amountController,
+                  label: 'Amount',
+                  inputFormatters: decimalAmountInputFormatters,
+                  validator: (value) {
+                    final amount = double.tryParse(value?.trim() ?? '');
+                    if (amount == null || amount <= 0) {
+                      return 'Enter a valid amount';
+                    }
+                    if (_isEditing && amount < widget.debt!.paidAmount) {
+                      return 'Total amount cannot be less than paid amount';
+                    }
+                    return null;
+                  },
+                ),
+                if (isTwoColumn)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: createdDateField),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(child: dueDateField),
+                    ],
+                  )
+                else ...[
+                  createdDateField,
+                  dueDateField,
+                ],
+                AppTextArea(
+                  controller: _noteController,
+                  label: 'Note',
+                  hintText: 'Optional note or terms',
+                ),
+                if (_errorMessage != null)
+                  FinancialFormError(message: _errorMessage!),
               ],
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
       actions: [
         DialogFormActions(
@@ -191,7 +194,7 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
           _dueDate!,
         ).isBefore(DateUtils.dateOnly(_createdAt))) {
       setState(
-        () => _errorMessage = 'Due date cannot be before the created date.',
+        () => _dueDateError = 'Due date cannot be before the created date.',
       );
       return;
     }
@@ -204,6 +207,7 @@ class _AddDebtDialogState extends ConsumerState<AddDebtDialog> {
     setState(() {
       _isSaving = true;
       _errorMessage = null;
+      _dueDateError = null;
     });
 
     try {

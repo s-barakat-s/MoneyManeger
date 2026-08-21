@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/models/audit_metadata.dart';
 import '../../../../core/utils/readable_date_formatter.dart';
+import '../../../../shared/models/audit_metadata.dart';
 import '../../../../shared/models/company_asset.dart';
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../application/company_asset_providers.dart';
 import '../asset_category_label.dart';
 
@@ -58,90 +58,72 @@ class _AssetFormDialogState extends ConsumerState<AssetFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AdaptiveFinancialFormDialog(
-      title: Text(_isEditing ? 'Edit asset' : 'Add asset'),
+      title: _isEditing ? 'Edit asset' : 'Add asset',
       canDismiss: !_isSaving,
-      content: ResponsiveDialogContent(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Asset name'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Asset name is required';
-                  }
-
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _priceController,
-                decoration: amountInputDecoration('Purchase value'),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: decimalAmountInputFormatters,
-                validator: (value) {
-                  final price = double.tryParse(value?.trim() ?? '');
-                  if (price == null || price <= 0) {
-                    return 'Enter a valid purchase value';
-                  }
-
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<AssetCategory>(
-                initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: [
-                  for (final category in AssetCategory.values)
-                    DropdownMenuItem(
-                      value: category,
-                      child: Text(category.label),
-                    ),
-                ],
-                onChanged: (value) => setState(() => _category = value),
-                validator: (value) =>
-                    value == null ? 'Select a category' : null,
-              ),
-              const SizedBox(height: 12),
-              DialogDateField(
-                label: 'Purchase date',
-                value: _formatDate(_purchaseDate),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _purchaseDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-
-                  if (picked != null) {
-                    setState(() => _purchaseDate = picked);
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _noteController,
-                decoration: const InputDecoration(labelText: 'Note'),
-                maxLines: 3,
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+      content: Form(
+        key: _formKey,
+        child: AppFormColumn(
+          children: [
+            AppTextField(
+              controller: _nameController,
+              autofocus: true,
+              label: 'Asset name',
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Asset name is required';
+                }
+                return null;
+              },
+            ),
+            AppMoneyField(
+              controller: _priceController,
+              label: 'Purchase value',
+              inputFormatters: decimalAmountInputFormatters,
+              validator: (value) {
+                final price = double.tryParse(value?.trim() ?? '');
+                if (price == null || price <= 0) {
+                  return 'Enter a valid purchase value';
+                }
+                return null;
+              },
+            ),
+            AppSelectField<AssetCategory>(
+              label: 'Category',
+              value: _category,
+              items: [
+                for (final category in AssetCategory.values)
+                  DropdownMenuItem(
+                    value: category,
+                    child: Text(category.label),
+                  ),
               ],
-            ],
-          ),
+              onChanged: (value) => setState(() => _category = value),
+              validator: (value) => value == null ? 'Select a category' : null,
+            ),
+            AppDateField(
+              label: 'Purchase date',
+              value: _formatDate(_purchaseDate),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _purchaseDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+
+                if (picked != null) {
+                  setState(() => _purchaseDate = picked);
+                }
+              },
+            ),
+            AppTextArea(
+              controller: _noteController,
+              label: 'Note',
+              hintText: 'Optional description or serial number',
+            ),
+            if (_errorMessage != null)
+              FinancialFormError(message: _errorMessage!),
+          ],
         ),
       ),
       actions: [

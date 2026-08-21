@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
-import 'app_card.dart';
+import 'app_fields.dart';
+import 'app_overlays.dart';
 
 class AppSearchFilterBar extends StatelessWidget {
   const AppSearchFilterBar({
@@ -21,37 +22,14 @@ class AppSearchFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: hintText,
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: controller.text.trim().isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: controller.clear,
-                      ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.md,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          AppFilterIconButton(isActive: filtersActive, onTap: onFilterTap),
-        ],
-      ),
+    return Row(
+      children: [
+        Expanded(
+          child: AppSearchField(controller: controller, hintText: hintText),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        AppFilterIconButton(isActive: filtersActive, onTap: onFilterTap),
+      ],
     );
   }
 }
@@ -60,11 +38,13 @@ class AppFilterIconButton extends StatelessWidget {
   const AppFilterIconButton({
     required this.isActive,
     required this.onTap,
+    this.activeCount,
     super.key,
   });
 
   final bool isActive;
   final VoidCallback onTap;
+  final int? activeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -87,23 +67,37 @@ class AppFilterIconButton extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             borderRadius: AppRadius.borderLg,
-            child: SizedBox(
-              width: 48,
-              height: 48,
+            child: SizedBox.square(
+              dimension: AppControlHeight.standard,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Icon(Icons.tune_rounded, color: foreground),
                   if (isActive)
-                    const Positioned(
-                      top: 11,
-                      right: 11,
+                    Positioned(
+                      top: AppSpacing.sm,
+                      right: AppSpacing.sm,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: Theme.of(context).colorScheme.primary,
                           shape: BoxShape.circle,
                         ),
-                        child: SizedBox(width: 8, height: 8),
+                        child: activeCount == null
+                            ? const SizedBox.square(dimension: AppSpacing.sm)
+                            : Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xs,
+                                ),
+                                child: Text(
+                                  '$activeCount',
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimary,
+                                      ),
+                                ),
+                              ),
                       ),
                     ),
                 ],
@@ -132,42 +126,12 @@ class AppFilterSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.sm,
-          AppSpacing.lg,
-          AppSpacing.lg,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: children,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppFilterActionBar(onClear: onClear, onApply: onApply),
-            ],
-          ),
-        ),
+    return AppBottomSheetShell(
+      title: title,
+      actions: AppFilterActionBar(onClear: onClear, onApply: onApply),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
       ),
     );
   }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_layout.dart';
 import 'app_radius.dart';
 import 'app_spacing.dart';
 import 'app_text_styles.dart';
+import 'app_theme_tokens.dart';
 
 class AppTheme {
   const AppTheme._();
@@ -14,41 +16,25 @@ class AppTheme {
       onPrimary: Colors.white,
       secondary: AppColors.info,
       error: AppColors.danger,
+      errorContainer: Color(0xFFFCE8E8),
+      onErrorContainer: Color(0xFF7F1219),
       primaryContainer: AppColors.primaryLight,
       onPrimaryContainer: AppColors.primaryDark,
       surface: AppColors.surface,
       onSurface: AppColors.textPrimary,
+      onSurfaceVariant: AppColors.textSecondary,
       outline: AppColors.border,
+      outlineVariant: AppColors.border,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      extensions: const [AppThemeTokens.light],
       scaffoldBackgroundColor: AppColors.background,
       splashColor: AppColors.primary.withValues(alpha: 0.08),
       highlightColor: AppColors.primary.withValues(alpha: 0.04),
-      textTheme: const TextTheme(
-        headlineLarge: AppTextStyles.pageTitle,
-        headlineMedium: AppTextStyles.cardNumber,
-        titleLarge: AppTextStyles.sectionTitle,
-        titleMedium: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          color: AppColors.textPrimary,
-        ),
-        bodyMedium: AppTextStyles.body,
-        bodySmall: AppTextStyles.caption,
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
+      textTheme: AppTextStyles.textTheme(colorScheme),
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -75,8 +61,8 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.borderXxl),
-        titleTextStyle: AppTextStyles.sectionTitle,
-        contentTextStyle: AppTextStyles.body,
+        titleTextStyle: AppTextStyles.textTheme(colorScheme).titleLarge,
+        contentTextStyle: AppTextStyles.textTheme(colorScheme).bodyMedium,
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surface,
@@ -118,7 +104,7 @@ class AppTheme {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
             color: selected ? AppColors.primary : AppColors.textSecondary,
-            size: 22,
+            size: AppIconSize.standard,
           );
         }),
       ),
@@ -179,9 +165,18 @@ class AppTheme {
           borderRadius: AppRadius.borderXl,
           borderSide: const BorderSide(color: AppColors.border),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.borderXl,
+          borderSide: BorderSide(
+            color: colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.primary,
+            width: AppBorderWidth.emphasized,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
@@ -189,13 +184,39 @@ class AppTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.danger,
+            width: AppBorderWidth.emphasized,
+          ),
         ),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.border,
         thickness: 1,
         space: 1,
+      ),
+      tabBarTheme: TabBarThemeData(
+        indicatorColor: colorScheme.primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelColor: colorScheme.primary,
+        unselectedLabelColor: colorScheme.onSurfaceVariant,
+        dividerColor: colorScheme.outlineVariant,
+        labelStyle: AppTextStyles.textTheme(colorScheme).labelLarge,
+        unselectedLabelStyle: AppTextStyles.textTheme(colorScheme).labelLarge,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.surfaceSoft,
+        selectedColor: colorScheme.primaryContainer,
+        disabledColor: colorScheme.onSurface.withValues(alpha: 0.08),
+        labelStyle: AppTextStyles.textTheme(colorScheme).labelMedium,
+        side: BorderSide(color: colorScheme.outlineVariant),
+        shape: const StadiumBorder(),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(AppControlHeight.standard),
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+        ),
       ),
       navigationRailTheme: const NavigationRailThemeData(
         labelType: NavigationRailLabelType.all,
@@ -217,58 +238,20 @@ class AppTheme {
       onPrimaryContainer: Colors.white,
       surface: AppColors.darkSurface,
       onSurface: AppColors.darkTextPrimary,
+      onSurfaceVariant: AppColors.darkTextSecondary,
       outline: AppColors.darkBorder,
+      outlineVariant: AppColors.darkBorder,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
+      extensions: const [AppThemeTokens.dark],
       scaffoldBackgroundColor: AppColors.darkBackground,
       splashColor: AppColors.primary.withValues(alpha: 0.12),
       highlightColor: AppColors.primary.withValues(alpha: 0.08),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          color: AppColors.darkTextPrimary,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w800,
-          color: AppColors.darkTextPrimary,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: AppColors.darkTextPrimary,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: AppColors.darkTextPrimary,
-        ),
-        bodyLarge: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w400,
-          color: AppColors.darkTextPrimary,
-        ),
-        bodyMedium: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-          color: AppColors.darkTextPrimary,
-        ),
-        bodySmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: AppColors.darkTextSecondary,
-        ),
-        labelLarge: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppColors.darkTextPrimary,
-        ),
-      ),
+      textTheme: AppTextStyles.textTheme(colorScheme),
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -349,7 +332,7 @@ class AppTheme {
             color: selected
                 ? AppColors.primaryLight
                 : AppColors.darkTextSecondary,
-            size: 22,
+            size: AppIconSize.standard,
           );
         }),
       ),
@@ -410,9 +393,18 @@ class AppTheme {
           borderRadius: AppRadius.borderXl,
           borderSide: const BorderSide(color: AppColors.darkBorder),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: AppRadius.borderXl,
+          borderSide: BorderSide(
+            color: colorScheme.onSurface.withValues(alpha: 0.12),
+          ),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.primary,
+            width: AppBorderWidth.emphasized,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
@@ -420,13 +412,39 @@ class AppTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: AppRadius.borderXl,
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.danger,
+            width: AppBorderWidth.emphasized,
+          ),
         ),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.darkBorder,
         thickness: 1,
         space: 1,
+      ),
+      tabBarTheme: TabBarThemeData(
+        indicatorColor: colorScheme.primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelColor: colorScheme.primary,
+        unselectedLabelColor: colorScheme.onSurfaceVariant,
+        dividerColor: colorScheme.outlineVariant,
+        labelStyle: AppTextStyles.textTheme(colorScheme).labelLarge,
+        unselectedLabelStyle: AppTextStyles.textTheme(colorScheme).labelLarge,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.darkSurfaceSoft,
+        selectedColor: colorScheme.primaryContainer,
+        disabledColor: colorScheme.onSurface.withValues(alpha: 0.08),
+        labelStyle: AppTextStyles.textTheme(colorScheme).labelMedium,
+        side: BorderSide(color: colorScheme.outlineVariant),
+        shape: const StadiumBorder(),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(AppControlHeight.standard),
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.borderMd),
+        ),
       ),
       navigationRailTheme: const NavigationRailThemeData(
         labelType: NavigationRailLabelType.all,

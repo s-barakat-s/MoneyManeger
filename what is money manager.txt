@@ -1,0 +1,2263 @@
+أيوه، الشات ده فعلاً بقى **المرجع الأساسي للمشروع**، وفيه قرارات معمارية وBackend/Auth/Multi-Business/Deno/UI كتير جدًا لو شات جديد دخل من غيرها ممكن بسهولة يرجعنا لورا أو يبوظ حاجة إحنا حليناها قبل كده.
+
+الرسالة اللي تحت دي معمولة كـ **MASTER HANDOFF**. احتفظ بيها، ولما تفتح شات جديد ابعتها في أول رسالة. هي مش مجرد وصف للتطبيق؛ فيها **إحنا بنينا إيه، ليه بنيناه كده، إيه اللي Production، إيه القديم، إيه الممنوع يتغير عشوائيًا، وإزاي أي تعديل جديد المفروض يتعمل**.
+
+---
+
+# MONEY MANAGER — MASTER PROJECT HANDOFF
+
+## Current architecture, backend, business rules, UI system, known fixes, and development rules
+
+Treat this message as the current source of truth for the project.
+
+Before making changes, understand the existing architecture and inspect only the files directly relevant to the requested task.
+
+Do NOT assume older implementations, old Firebase callable flows, or old “single workspace” behavior are still authoritative.
+
+---
+
+# 1. PROJECT OVERVIEW
+
+Money Manager is a Flutter financial-management application intended to support multiple Businesses and multiple users inside each Business.
+
+Main capabilities include:
+
+* Authentication
+* User profiles
+* Multiple Businesses per account
+* Business creation
+* Business invitations
+* Members and roles
+* Business switching
+* Transactions
+* Transfers
+* Money Holders
+* Debts
+* Receivables
+* Debt payments
+* Receivable collections
+* Assets
+* Dashboard financial summaries
+* Audit/activity logging
+* Actor attribution (“Created by …”)
+* Settings / Light and Dark mode
+
+The application is designed around this hierarchy:
+
+```text
+ACCOUNT
+   ↓
+BUSINESSES
+   ↓
+CURRENT BUSINESS
+   ↓
+BUSINESS-SCOPED FINANCIAL DATA
+```
+
+An authenticated user can belong to MULTIPLE Businesses.
+
+`activeBusinessId` is only a pointer to the currently selected Business.
+
+It is NOT the user's permanent Business ID.
+
+---
+
+# 2. LOCAL PROJECT PATH
+
+Main Flutter project:
+
+```text
+D:\projects\moneymanegar
+```
+
+Important spelling:
+
+```text
+moneymanegar
+```
+
+is the local project folder.
+
+The Deno Deploy application is named:
+
+```text
+moneymaneger
+```
+
+Notice the spelling difference.
+
+Do not casually rename either.
+
+---
+
+# 3. MAIN STACK
+
+Frontend:
+
+```text
+Flutter
+Dart
+Riverpod
+GoRouter
+Firebase Auth
+Cloud Firestore
+SharedPreferences
+Freezed / JSON serialization
+```
+
+Backend/API:
+
+```text
+Deno Deploy
+```
+
+Firebase is still used for authentication and Firestore data.
+
+Deno exists mainly for trusted server-side operations that could not safely or conveniently be done directly from Flutter.
+
+---
+
+# 4. WHY DENO EXISTS
+
+Originally some trusted operations were implemented/planned with Firebase Cloud Functions.
+
+The project then hit an important constraint:
+
+Firebase Functions deployment required the Blaze/pay-as-you-go plan.
+
+Because paid Firebase Functions were not an acceptable dependency, a Deno backend was created as an alternative.
+
+A Deno proof-of-concept was first tested successfully for:
+
+```text
+/health
+/auth-check
+Firestore read/write
+Firebase token validation
+```
+
+It was then expanded into the actual production backend.
+
+Therefore:
+
+**Deno is not just an experiment anymore.**
+
+It currently handles important production Business/member/invitation/activity/identity operations.
+
+Do not move functionality back to Firebase Functions unless explicitly requested.
+
+---
+
+# 5. DENO BACKEND LOCATION
+
+Backend work has been under:
+
+```text
+D:\projects\moneymanegar\poc\deno-firebase
+```
+
+Even though the directory contains `poc`, the Deno architecture evolved beyond a simple proof-of-concept.
+
+There may also still be Firebase Functions code in the repository.
+
+Do NOT assume those Functions are the active production backend.
+
+Always trace the currently used Flutter repository before changing backend code.
+
+---
+
+# 6. DENO PRODUCTION DEPLOYMENT
+
+Production Deno app:
+
+```text
+moneymaneger
+```
+
+Production URL:
+
+```text
+https://moneymaneger.1sbarakats.deno.net
+```
+
+Deploy from the project root:
+
+```powershell
+cd D:\projects\moneymanegar
+deno deploy --app moneymaneger --prod
+```
+
+If `deno` is not available in PATH:
+
+```powershell
+C:\Users\user\.deno\bin\deno.exe deploy --app moneymaneger --prod
+```
+
+Important:
+
+Changing Deno code locally does NOT affect the application until a new production deployment is made.
+
+Flutter:
+
+```text
+Hot Reload
+Hot Restart
+```
+
+does NOT deploy backend changes.
+
+The latest known successful production deployment in this project was made with:
+
+```text
+deno deploy --app moneymaneger --prod
+```
+
+and production deployment completed successfully.
+
+---
+
+# 7. FIREBASE PROJECT
+
+Firebase project ID:
+
+```text
+moneymaneger-v2
+```
+
+Firestore rules and indexes have previously been deployed.
+
+Do not casually change:
+
+```text
+firestore.rules
+firestore.indexes.json
+```
+
+for a UI task.
+
+---
+
+# 8. AUTHENTICATION
+
+Authentication includes:
+
+```text
+Email/password
+Google Sign-In
+Email verification
+Password reset
+Saved accounts
+Account switching
+Profile setup
+```
+
+Authentication state and Business state are separate concepts.
+
+A user logging in does NOT automatically imply creating a Business.
+
+---
+
+# 9. IMPORTANT ONBOARDING RULE
+
+The old approach of automatically provisioning a Business on first login was removed.
+
+Current intended behavior is roughly:
+
+```text
+Authenticate
+↓
+verification/profile requirements
+↓
+resolve Business access
+↓
+show existing Businesses / invitations
+↓
+user can select a Business,
+accept an invitation,
+or create a Business
+↓
+App
+```
+
+Important invariant:
+
+**Do NOT automatically create a Business just because a user logged in.**
+
+The system must support:
+
+```text
+one user
+→ multiple Businesses
+```
+
+Google-authenticated users normally already have verified email status.
+
+Email/password verification rules must remain intact.
+
+---
+
+# 10. USER PROFILE SOURCE
+
+Canonical profile documents are:
+
+```text
+userProfiles/{uid}
+```
+
+This is important for:
+
+* display name
+* username
+* actor identity
+* invitation/member identity
+
+Old code referencing legacy user-profile structures should not automatically be treated as authoritative.
+
+---
+
+# 11. OLD USERNAME LOGIN / resolveUsernameEmail
+
+There used to be a callable-style username/email resolver.
+
+That active flow was removed.
+
+Current login should use:
+
+```text
+Email + password
+or
+Google
+```
+
+Username remains part of profile identity/display purposes.
+
+Do NOT resurrect `resolveUsernameEmail` or old callable Firebase Functions unless explicitly required.
+
+---
+
+# 12. MULTI-BUSINESS ARCHITECTURE
+
+Multi-Business support is implemented.
+
+A Business ID is independent from the user's UID.
+
+Do NOT use:
+
+```text
+businessId = uid
+```
+
+as an architectural assumption.
+
+The currently selected Business is tracked using:
+
+```text
+activeBusinessId
+```
+
+and financial repositories/providers use that scope.
+
+---
+
+# 13. WORKSPACE TERMINOLOGY
+
+Internally, some older classes/files/providers may still contain names such as:
+
+```text
+Workspace
+workspaceResolution
+workspace_onboarding
+```
+
+That is historical/internal terminology.
+
+USER-FACING terminology should be:
+
+```text
+Business
+```
+
+Do not introduce “Workspace” back into normal UI copy.
+
+---
+
+# 14. BUSINESS API — CORE PHASE
+
+The Deno Business workspace migration implemented endpoints including:
+
+```text
+GET /api/workspaces
+POST /api/workspaces/select
+POST /api/workspaces
+```
+
+Flutter was migrated to HTTP-backed Business repositories rather than relying on old Firebase callable infrastructure.
+
+One important repository implementation is/was:
+
+```text
+HttpBusinessWorkspaceRepository
+```
+
+The exact current endpoint/repository implementation should always be inspected before editing.
+
+---
+
+# 15. MEMBERSHIP DOMAIN
+
+The project has a real Business membership model.
+
+Membership concepts include fields such as:
+
+```text
+uid
+roleId
+status
+joinedAt
+invitedAt
+invitedBy
+createdAt
+updatedAt
+```
+
+Membership statuses include concepts such as:
+
+```text
+invited
+active
+suspended
+removed
+```
+
+---
+
+# 16. ROLES
+
+Canonical roles include:
+
+```text
+Owner
+Admin
+Accountant
+Viewer
+```
+
+There is a domain-level permission architecture containing concepts such as:
+
+```text
+BusinessMember
+BusinessRole
+Permission
+BusinessAccess
+```
+
+---
+
+# 17. VERY IMPORTANT TEAM PERMISSION RULE
+
+The Business creator is identified using:
+
+```text
+business.ownerUid
+```
+
+The creator/Owner is the ONLY team manager.
+
+That means team-management operations such as:
+
+```text
+invite member
+revoke invitation
+change role
+suspend member
+reactivate member
+remove member
+manage assignable roles
+```
+
+are Owner-only.
+
+Admin is financially powerful but is NOT a team manager.
+
+Do NOT restore:
+
+```text
+members.manage
+```
+
+to the canonical Admin role.
+
+This was an intentional product/security decision.
+
+---
+
+# 18. ACTIVITY PERMISSION
+
+Activity access uses the existing permission architecture.
+
+Historically:
+
+```text
+activity.read
+```
+
+has been available to roles such as:
+
+```text
+Owner
+Admin
+Accountant
+```
+
+Do not change role permissions from a presentation/UI task.
+
+---
+
+# 19. INVITATIONS
+
+Business invitation support is implemented.
+
+It includes concepts such as:
+
+```text
+pending invitation discovery
+verified email matching
+accept invitation
+Business invitation management
+```
+
+Invitation acceptance is intended to be atomic.
+
+Received Invitations are:
+
+**ACCOUNT-SCOPED**
+
+not tied to whichever Business happens to be active.
+
+Therefore Received Invitations must NOT display a current-Business switcher.
+
+---
+
+# 20. MEMBERS UI / BUSINESS MANAGEMENT
+
+Member management exists and includes:
+
+```text
+member listing
+roles
+pending invitations
+role changes
+suspend/reactivate/remove
+```
+
+Members are Business-scoped.
+
+UI was later polished into groups such as:
+
+```text
+Active
+Suspended
+Former
+```
+
+Owner should remain visually identifiable.
+
+---
+
+# 21. BUSINESS SWITCHING RULE
+
+This is a very important UX rule:
+
+**Business switching happens from the Dashboard only.**
+
+Mobile Dashboard contains the Business selector.
+
+Other Mobile Business pages should NOT repeatedly show Business switcher/context cards.
+
+For example:
+
+```text
+Debts
+Receivables
+Assets
+Transactions
+Members
+Activity
+Settings
+```
+
+must not contain another Business-switching control.
+
+Desktop sidebar may show current Business context, but switching should not become globally available everywhere unless intentionally redesigned later.
+
+---
+
+# 22. FINANCIAL FEATURES
+
+Current financial features include:
+
+```text
+Transactions
+Transfers
+Money Holders
+Debts
+Receivables
+Debt payments
+Receivable collections
+Assets
+Dashboard
+```
+
+---
+
+# 23. MONEY HOLDERS
+
+Older internal code may call Money Holders:
+
+```text
+Owner / Owners
+```
+
+User-facing terminology was standardized to:
+
+```text
+Money Holder
+Money Holders
+```
+
+Be careful when renaming internal models because `Owner` may still be the domain class.
+
+Do not perform broad rename refactors merely because the UI says Money Holder.
+
+---
+
+# 24. FINANCIAL AUDIT METADATA
+
+Financial records use audit metadata concepts such as:
+
+```text
+createdBy
+createdAt
+updatedBy
+updatedAt
+```
+
+Audit metadata was added across major financial entities.
+
+The authenticated actor UID is captured when writes happen.
+
+This is critical to actor attribution.
+
+---
+
+# 25. ACTOR ATTRIBUTION REQUIREMENT
+
+The product requirement is NOT:
+
+“Go to Activity to see who did something.”
+
+The requirement is:
+
+**Every relevant financial record should directly show who created/recorded it.**
+
+Examples:
+
+```text
+Created by sofa
+```
+
+or for payment/collection history:
+
+```text
+Recorded by sofa
+```
+
+Actor attribution is secondary metadata.
+
+It should not dominate the financial card.
+
+---
+
+# 26. ACTIVITY VS INLINE ATTRIBUTION
+
+Activity is still useful as the full chronological audit log.
+
+But Activity is NOT a substitute for inline actor attribution.
+
+Example:
+
+```text
+Debt created by User A
+Payment later recorded by User B
+```
+
+Expected:
+
+Debt:
+
+```text
+Created by User A
+```
+
+Payment:
+
+```text
+Recorded by User B
+```
+
+The parent record creator must remain independent from whoever later records payments/collections.
+
+---
+
+# 27. ACTIVITY API
+
+Production Activity uses:
+
+```text
+GET /api/businesses/:businessId/activity
+```
+
+Activity uses cursor pagination.
+
+The backend resolves actor identities server-side.
+
+Flutter receives fields including:
+
+```text
+actorUid
+actorName
+```
+
+Activity does NOT perform generic UID → name lookup locally.
+
+---
+
+# 28. ACTOR IDENTITY RESOLUTION
+
+Activity actor names come from the backend.
+
+Identity lookup uses:
+
+```text
+userProfiles/{uid}
+```
+
+with a fallback sequence equivalent to:
+
+```text
+displayName
+→ username
+→ Unknown member
+```
+
+Never display raw Firebase UIDs in normal user-facing UI.
+
+---
+
+# 29. GENERIC UID ACTOR RESOLVER
+
+Originally, actor resolution outside Activity was transaction-specific.
+
+There was a transaction resolver path such as:
+
+```text
+transactionActorNamesProvider
+→ resolveTransactionActors(...)
+→ transaction actor resolver endpoint
+```
+
+This was later generalized.
+
+A shared UID-based actor resolver was implemented so financial screens can resolve:
+
+```text
+audit.createdBy UID
+→ actor display name
+```
+
+The shared resolver is reused for financial attribution.
+
+Do NOT recreate one resolver per feature.
+
+---
+
+# 30. IMPORTANT ACTOR RESOLVER AUTHORIZATION FIX
+
+The generic actor resolver initially required:
+
+```text
+members.read
+```
+
+That caused normal active Business members to receive denied lookups, which the UI incorrectly surfaced as:
+
+```text
+Unknown member
+```
+
+This was fixed.
+
+The resolver now requires the requesting user to be an:
+
+```text
+active Business member
+```
+
+rather than requiring team-management/member-reading permission.
+
+Important distinction:
+
+The REQUESTING USER must have active Business membership.
+
+Do NOT require the historical actor himself to still be an active member, otherwise old records from removed members could become impossible to identify.
+
+---
+
+# 31. IMPORTANT RIVERPOD ACTOR PROVIDER FIX
+
+A subtle Riverpod bug occurred.
+
+Financial rows were doing something like passing a freshly created:
+
+```dart
+List<String>
+```
+
+to a family/provider every rebuild.
+
+Because list identity changed, Riverpod treated it as a different provider instance repeatedly.
+
+Result:
+
+```text
+Unknown member
+→ one second later actual name
+```
+
+or persistent loading/fallback behavior.
+
+This was fixed by giving the actor-name provider a stable canonical key rather than unstable new List identity.
+
+Do not regress this.
+
+---
+
+# 32. CURRENT INLINE ACTOR COVERAGE
+
+Known attribution was wired for:
+
+```text
+Transactions
+Debts
+Transfers
+Receivables
+Assets
+```
+
+using the shared UID resolver.
+
+Money Holders should only show attribution if their existing model/audit metadata supports it without schema changes.
+
+Payment/collection history was NOT wired at that moment because there was no existing payment-history presentation surface to attach the text to.
+
+The underlying stream/provider exists, but introducing a brand-new history UI was intentionally not done as part of the small attribution task.
+
+---
+
+# 33. “UNKNOWN MEMBER” LOADING STATE
+
+If a financial page briefly shows:
+
+```text
+Unknown member
+```
+
+before changing to the real name, first distinguish:
+
+```text
+loading state
+```
+
+from:
+
+```text
+genuine unresolved identity
+```
+
+Do NOT use “Unknown member” merely because the async provider is still loading.
+
+Preferred behavior is:
+
+* hide attribution while loading, or use subtle placeholder
+* show cached/resolved name when available
+* show `Unknown member` only when resolution actually completes without identity
+
+Do not immediately change backend if names appear correctly after loading.
+
+---
+
+# 34. FINANCIAL MUTATION GUARDS
+
+Financial forms capture:
+
+```text
+Account UID
+Business ID
+```
+
+when opened.
+
+Before mutation they verify the context is still the same.
+
+If current Business changed while the form was open, the operation must not silently write into the wrong Business.
+
+There is a user-facing message concept similar to:
+
+```text
+The current Business changed while this form was open...
+```
+
+Do not remove these guards during UI refactoring.
+
+---
+
+# 35. DASHBOARD
+
+Dashboard shows core Business financial status.
+
+Important concepts include:
+
+```text
+Available Cash
+Business Worth
+Debts
+Receivables
+Assets
+Money Holders
+Recent Transactions
+```
+
+“Company Worth” was renamed user-facing to:
+
+```text
+Business Worth
+```
+
+“Company Assets” was renamed user-facing to:
+
+```text
+Assets
+```
+
+---
+
+# 36. BUSINESS WORTH
+
+The Financial Breakdown explains Business Worth using concepts equivalent to:
+
+```text
+Available Cash
++ Receivables
++ Assets
+- Debts
+= Business Worth
+```
+
+The exact current calculation implementation is authoritative.
+
+Do not reimplement financial formulas from UI code.
+
+---
+
+# 37. DASHBOARD DESKTOP DESIGN
+
+The final intended Desktop Dashboard direction was:
+
+```text
+Financial Position
+
+[ centered purple summary card ]
+(click opens Financial Breakdown)
+
+Financial Snapshot
+[Debts][Receivables][Assets][Money Holders]
+
+Recent Transactions
+[...]
+```
+
+Do not put the full Financial Breakdown inline inside the purple summary card.
+
+Use progressive disclosure.
+
+---
+
+# 38. DASHBOARD MOBILE HEADER
+
+A major architectural bug was fixed here.
+
+Originally the Dashboard “header” lived inside the page body:
+
+```text
+AppShell
+→ SafeArea
+→ PageContainer
+→ ScrollView
+```
+
+This created unwanted top spacing and prevented it behaving like a real AppBar.
+
+The solution introduced real mobile AppBar support in AppShell.
+
+Dashboard now uses a real mobile AppBar.
+
+Do not move the Dashboard header back into scrollable page content.
+
+---
+
+# 39. MOBILE DASHBOARD APP BAR
+
+Accepted direction:
+
+```text
+[logo] Money Manager   [Business ▼]   [Settings]
+```
+
+Business switching belongs here.
+
+Do not repeat the same selector throughout every page.
+
+---
+
+# 40. QUICK ADD
+
+Quick Add went through multiple designs.
+
+The accepted interaction is the compact older-style interaction:
+
+```text
+center +
+↓ tap
++ rotates to ×
+compact anchored menu appears above it
+```
+
+Do NOT automatically replace it with a full bottom sheet.
+
+Important copy examples include:
+
+```text
+Transfer
+Move money between money holders
+
+Money Holder
+Add a place to hold money
+```
+
+Preserve the compact floating interaction unless explicitly redesigning it.
+
+---
+
+# 41. MOBILE PRIMARY NAVIGATION
+
+Core mobile navigation includes concepts such as:
+
+```text
+Home
+Transactions
+Quick Add
+Transfers
+Reports
+```
+
+Secondary screens should generally use Back navigation rather than duplicating the bottom nav unnecessarily.
+
+---
+
+# 42. DESKTOP SIDEBAR
+
+Desktop uses a sidebar around:
+
+```text
+248px
+```
+
+and grouped navigation such as:
+
+```text
+OVERVIEW
+Dashboard
+Reports
+
+MONEY
+Transactions
+Transfers
+
+FINANCE
+Money Holders
+Debts
+Receivables
+Assets
+
+BUSINESS
+Members
+Activity
+Received Invitations
+
+Settings
+```
+
+Actual visibility may be permission/context dependent.
+
+---
+
+# 43. IMPORTANT SCROLLBAR BUG
+
+Windows Desktop previously crashed with:
+
+```text
+The Scrollbar's ScrollController has no ScrollPosition attached.
+```
+
+Cause:
+
+Scrollbar and ListView were not sharing an explicit controller.
+
+Correct pattern:
+
+```text
+State owns ScrollController
+↓
+same controller supplied to Scrollbar
+and ListView
+↓
+dispose controller
+```
+
+Do not “fix” this by removing scrollbar hover behavior.
+
+---
+
+# 44. IMPORTANT HERO BUG
+
+There was a runtime crash:
+
+```text
+A Hero widget cannot be the descendant of another Hero widget.
+```
+
+The cause was page-level Hero wrappers around routes such as:
+
+```text
+Receivables
+Debts
+Assets
+Money Holders
+```
+
+The page-level Hero wrappers were removed.
+
+Hero should only be used for the intended summary/destination element.
+
+Do not reintroduce page-level Hero around an entire AppShell/page.
+
+---
+
+# 45. UI DESIGN SYSTEM
+
+A centralized design system was built.
+
+Major concepts include:
+
+```text
+ColorScheme
+AppThemeTokens
+AppSpacing
+AppRadius
+AppContentWidth
+AppBreakpoints
+semantic financial colors
+shared form controls
+shared cards
+shared page headers
+shared dialogs
+```
+
+Use these rather than raw arbitrary values whenever possible.
+
+---
+
+# 46. LIGHT THEME COLOR CALIBRATION
+
+Known calibrated Light palette includes approximately:
+
+```text
+Primary              #6336D1
+Deep primary         #45209C
+Primary container    #EAE2FF
+Background           #F6F7F9
+Surface              #FFFEFF
+Subtle surface       #EEF0F3
+Border               #D9DCE3
+
+Income / Success     #087A4B
+Expense / Debt       #B4232C
+Receivable / Info    #1769AA
+Warning / Assets     #9A5B00
+
+Primary text         #17151B
+Secondary text       #514D57
+Muted text           #6F6B74
+```
+
+Do not turn the app into a lavender/purple haze.
+
+Purple is a brand/accent color, not the background of every component.
+
+---
+
+# 47. LAYOUT TOKENS
+
+Spacing system:
+
+```text
+4
+8
+12
+16
+20
+24
+32
+48
+64
+```
+
+Radius concepts include:
+
+```text
+8
+12
+16
+20
+24
+pill
+```
+
+Breakpoints:
+
+```text
+Compact: 600
+Expanded: 900
+Wide: 1200
+```
+
+Content widths include approximately:
+
+```text
+360
+420
+560
+720
+1120
+1360
+```
+
+Motion durations include approximately:
+
+```text
+100ms
+150ms
+200ms
+300ms
+```
+
+---
+
+# 48. SHARED UI COMPONENTS
+
+The UI system includes components such as:
+
+```text
+AppButton
+AppTextField
+AppMoneyField
+AppSelectField
+AppDateField
+AppTextArea
+AppSearchField
+AppTabBar
+AppStatusChip
+AppCard
+AppSummaryCard
+AppListRow
+AppDivider
+AppDialogShell
+AppBottomSheetShell
+AppMobileFormCard
+AdaptiveFinancialFormDialog
+AppFormBody
+AppFormActionBar
+AppPageContainer
+AppSectionHeader
+PageHeader
+AppIconButton
+empty/error/skeleton states
+```
+
+Before creating a new widget, inspect whether a shared one already exists.
+
+---
+
+# 49. FINANCIAL FORM FIELD ORDER
+
+Do not casually change field ordering.
+
+Transaction:
+
+```text
+Amount
+Money Holder
+Type
+Date
+Note
+```
+
+Transfer:
+
+```text
+From
+To
+Amount
+Date
+Note
+```
+
+Debt:
+
+```text
+Creditor
+Amount
+Created date
+Due date
+Note
+```
+
+Receivable:
+
+```text
+Debtor
+Amount
+Created date
+Due date
+Note
+```
+
+Payment / Collection:
+
+```text
+Amount
+Money Holder
+Date
+Note
+```
+
+Asset:
+
+```text
+Name
+Value
+Category
+Purchase date
+Note
+```
+
+---
+
+# 50. FINANCIAL FORM VALIDATION
+
+Important rules include:
+
+Amounts:
+
+```text
+positive
+maximum 2 decimal places
+```
+
+Debt/receivable:
+
+```text
+Due date >= Created date
+```
+
+Transaction/payment:
+
+```text
+requires Money Holder
+```
+
+Transfer:
+
+```text
+requires two Money Holders
+```
+
+If exactly one eligible Money Holder exists where appropriate, existing auto-selection behavior may apply.
+
+Do not change validation from a visual task.
+
+---
+
+# 51. FINAL FINANCIAL FORM PRESENTATION
+
+There was initially a move to full-screen Mobile financial forms.
+
+The user disliked the large empty space.
+
+The direction was changed back to:
+
+**compact centered modal cards on Mobile**
+
+rather than giant full-screen forms.
+
+Current shared flow is conceptually:
+
+```text
+AdaptiveFinancialFormDialog
+       ↓
+Desktop → AppDialogShell
+Mobile  → AppMobileFormCard
+```
+
+Mobile card:
+
+* centered
+* constrained width
+* content-driven height
+* max-height
+* scrollable body when required
+* keyboard-safe
+* X/close in header
+* primary action
+* no unnecessary giant Cancel bar
+
+Desktop remains a standard constrained dialog.
+
+Do not convert these back to full-screen forms without explicit request.
+
+---
+
+# 52. FINANCIAL LIST UI
+
+Financial lists were redesigned into compact Mobile cards and denser Desktop rows.
+
+Transactions:
+
+```text
+type/note
+holder/date
+actor metadata
+amount
+menu
+```
+
+Transfers:
+
+```text
+From → To
+date/note
+actor metadata
+amount
+menu
+```
+
+Debts / Receivables:
+
+```text
+Person + status
+Remaining amount
+progress
+Paid/Collected X of Y
+Created by actor
+Pay / Collect
+```
+
+Assets:
+
+compact asset information.
+
+Money Holders:
+
+name/subtitle/balance/menu.
+
+Do not inflate these into huge cards again.
+
+---
+
+# 53. TRANSACTION DETAILS
+
+Transaction Details was redesigned to be constrained rather than stretching across wide Desktop layouts.
+
+Hierarchy:
+
+```text
+type chip
+amount
+Details
+Money Holder
+Date
+Note if present
+
+Audit
+Created by
+Created timestamp
+possibly updated metadata
+```
+
+Audit is secondary.
+
+Amount is primary.
+
+---
+
+# 54. ACTIVITY UI
+
+Activity exists as a Business-scoped chronological audit feed.
+
+Actor names are already server-resolved.
+
+It was polished to look human-readable rather than like raw database logs.
+
+Do not expose raw provider exceptions or UIDs.
+
+---
+
+# 55. MEMBERS UI
+
+Members was polished in UI-7.
+
+Direction:
+
+```text
+Active
+Suspended
+Former
+```
+
+Compact records.
+
+Owner clearly identifiable.
+
+Management actions use contextual/overflow presentation rather than many giant buttons.
+
+Existing owner-only authorization remains authoritative.
+
+---
+
+# 56. RECEIVED INVITATIONS UI
+
+Received Invitations is account-scoped.
+
+It should communicate things such as:
+
+```text
+Business name
+offered role
+existing actions
+```
+
+No current-Business switcher.
+
+---
+
+# 57. SETTINGS
+
+Settings was polished to use compact sections.
+
+Appearance supports:
+
+```text
+Light
+Dark
+```
+
+Only.
+
+No:
+
+```text
+System
+```
+
+option.
+
+Theme applies using existing architecture.
+
+Business switching must NOT be added to Settings.
+
+---
+
+# 58. AUTH / ONBOARDING UI
+
+Auth/Onboarding presentation was polished without changing behavior.
+
+The design direction is:
+
+* focused
+* compact
+* constrained
+* reduced unnecessary decoration
+* less excessive empty space
+* centered Desktop experience
+
+Existing flows such as:
+
+```text
+Login
+Registration
+Google
+Verification
+Profile setup
+Saved accounts
+Password reset
+Business onboarding
+```
+
+remain functionally unchanged.
+
+---
+
+# 59. WINDOWS REMOTE CONFIG ISSUE
+
+A Windows native C++ assertion/crash was traced to Firebase Remote Config.
+
+The final mitigation:
+
+**return before ANY Remote Config access on Windows.**
+
+Not just before `fetchAndActivate`.
+
+Do not allow FirebaseRemoteConfig initialization/access on Windows in that service.
+
+There were also Windows certificate-revocation security alerts related to this HTTPS behavior.
+
+Do NOT disable:
+
+```text
+TLS validation
+certificate validation
+certificate revocation checking
+```
+
+as a workaround.
+
+---
+
+# 60. RIVERPOD STATE RULE
+
+Be very careful when using Riverpod `.family` providers with:
+
+```text
+List
+Map
+Set
+```
+
+arguments created inside `build()`.
+
+New collection identities can cause provider recreation.
+
+Prefer stable/canonical provider keys or immutable equality-safe parameters.
+
+This already caused the actor-name bug described earlier.
+
+---
+
+# 61. PROVIDER / REPOSITORY ARCHITECTURE
+
+The project broadly follows:
+
+```text
+Presentation
+↓
+Application / Providers
+↓
+Domain repositories/models
+↓
+Data repository implementation
+↓
+Firestore / HTTP backend
+```
+
+Business scope should flow through the repository/provider architecture.
+
+Do not make UI widgets directly call Firestore for convenience.
+
+Do not bypass domain/repository abstractions unless explicitly redesigning the architecture.
+
+---
+
+# 62. FIRESTORE VS DENO RESPONSIBILITIES
+
+Do not assume “everything should go through Deno.”
+
+Some financial data still uses Firestore repository implementations directly.
+
+Deno is used for operations that need trusted server-side logic, identity resolution, membership/Business coordination, etc.
+
+Before moving an operation between Firestore and Deno, inspect the existing repository implementation and understand why it is there.
+
+---
+
+# 63. ACTIVITY / AUDIT SECURITY
+
+Actor attribution must never trust arbitrary names from Flutter.
+
+Canonical identity is based on authenticated UID and trusted profile data.
+
+Do not let clients arbitrarily submit:
+
+```text
+createdByName
+```
+
+as authoritative audit identity.
+
+Store UID / trusted audit metadata and resolve the display identity.
+
+---
+
+# 64. APK BUILD
+
+To create a release APK:
+
+```powershell
+cd D:\projects\moneymanegar
+flutter build apk --release
+```
+
+Expected output:
+
+```text
+build\app\outputs\flutter-apk\app-release.apk
+```
+
+For architecture-specific APKs:
+
+```powershell
+flutter build apk --release --split-per-abi
+```
+
+Modern Android devices usually use:
+
+```text
+arm64-v8a
+```
+
+---
+
+# 65. GIT LINE ENDING WARNINGS
+
+On Windows Git may print:
+
+```text
+LF will be replaced by CRLF
+```
+
+These are line-ending warnings, not necessarily compilation failures.
+
+Do not start mass-formatting or rewriting the repository solely because these warnings appear.
+
+---
+
+# 66. CURRENT UI PROJECT STATUS
+
+The major UI/UX phases have effectively been completed.
+
+Rough progression:
+
+```text
+UX-1 Product Audit
+UX-2 Information Architecture
+UX-3 Navigation Architecture
+UX-4 Financial Workflows
+UX-5 Business / Team / Settings
+UX-6 Usability Validation
+
+UI-1 Design Foundations
+UI-1.1 Color Calibration
+UI-2 Shared Components
+UI-3 Shell / Navigation / Quick Add
+UI-4 Dashboard
+UI-5 Financial Lists
+UI-6 Financial Forms / Transaction Details
+UI-7 Members / Activity / Invitations / Settings
+UI-8 Auth / Onboarding
+UI-9 / UI-10 light responsive/dark/motion/final polish
+```
+
+Later passes intentionally avoided redesigning already accepted screens.
+
+Reduced-motion preferences were also respected in card interactions while retaining fast hover/tap behavior for normal users.
+
+At this stage, future work should preferably be treated as:
+
+```text
+specific bug
+specific visual issue
+or new feature
+```
+
+rather than another broad UI redesign phase.
+
+---
+
+# 67. DO NOT BLINDLY TRUST STATIC REPORTS
+
+This project has repeatedly encountered situations where:
+
+```text
+dart analyze = clean
+```
+
+but runtime UI was broken.
+
+Examples included:
+
+* blank Mobile form body
+* wrong AppBar placement
+* Scrollbar runtime crash
+* nested Hero crash
+* dynamic Grid crossAxisCount = 0
+* async actor attribution flicker
+
+Therefore runtime behavior matters.
+
+However, when using an AI coding agent, do NOT automatically waste credits making it run every possible test.
+
+The human developer usually runs the application and visually checks it.
+
+---
+
+# 68. CODING AI / VIBE CODING PROMPT STYLE
+
+This is a strong project workflow preference.
+
+When writing prompts for Codex/Antigravity/Claude/Gemini/etc., default to:
+
+**MINIMUM-CREDIT MODE**
+
+Prompt structure:
+
+```text
+Goal
+→ narrow scope
+→ only critical constraints
+→ stop
+```
+
+Example principles:
+
+```text
+Inspect only directly relevant files.
+Make the smallest necessary edit.
+Do not audit the repo.
+Do not broad-refactor unrelated code.
+Do not repeat constraints 20 times.
+Do not run tests/build/analyze/format unless explicitly requested.
+Do not do runtime verification unless explicitly requested.
+Do not produce a detailed final report.
+After the requested edits, stop.
+```
+
+Assume the developer will usually:
+
+```text
+run the app
+test it
+visually inspect it
+```
+
+himself.
+
+Long prompts should only be used for genuinely complex:
+
+```text
+architecture
+security
+migration
+multi-system changes
+```
+
+not for ordinary UI/bug fixes.
+
+---
+
+# 69. HOW TO HANDLE A BUG
+
+For a bug:
+
+Do NOT start with:
+
+```text
+audit the entire repository and find best architecture
+```
+
+Instead:
+
+1. Read the exact error.
+2. Identify the likely file/class.
+3. Inspect only that file and directly related dependency.
+4. Fix the actual cause.
+5. Stop.
+
+Example:
+
+A Riverpod `ConsumerWidget` must use:
+
+```dart
+Widget build(BuildContext context, WidgetRef ref)
+```
+
+while a `ConsumerState` / `State` build method uses:
+
+```dart
+Widget build(BuildContext context)
+```
+
+because `ConsumerState` already has `ref`.
+
+This exact issue previously occurred in:
+
+```text
+transfers_page.dart
+```
+
+Do not repeat it.
+
+---
+
+# 70. HOW TO HANDLE UI CHANGES
+
+For a UI task:
+
+Preserve:
+
+```text
+providers
+validation
+routing
+backend
+Business scope
+financial calculations
+authorization
+```
+
+unless the task explicitly requires changing them.
+
+Start with shared UI components only if the issue is genuinely shared.
+
+Do not change 10 feature files when one shared component can safely solve the issue.
+
+But also do not blindly modify a shared component if it could regress accepted screens.
+
+---
+
+# 71. HOW TO HANDLE BACKEND CHANGES
+
+Before modifying Deno:
+
+Determine:
+
+```text
+Does Flutter currently call this Deno endpoint?
+Is there already a repository abstraction?
+Does this change require production deploy?
+Does Firestore already provide this feature directly?
+```
+
+After changing production Deno behavior, remember:
+
+```powershell
+deno deploy --app moneymaneger --prod
+```
+
+A Flutter restart alone cannot apply Deno changes.
+
+---
+
+# 72. HOW TO HANDLE BUSINESS-SCOPED DATA
+
+Never assume the user only has one Business.
+
+Every Business financial operation must remain correctly scoped to the current Business.
+
+Do not accidentally query or write by UID when the required scope is:
+
+```text
+Business ID
+```
+
+Always respect the existing active Business architecture.
+
+---
+
+# 73. HOW TO HANDLE ACCOUNT-SCOPED DATA
+
+Not everything belongs to the active Business.
+
+Examples:
+
+```text
+Received Invitations
+Saved accounts
+authentication/profile
+```
+
+are account-level concepts.
+
+Do not incorrectly attach them to `activeBusinessId`.
+
+---
+
+# 74. SECURITY RULE OF THUMB
+
+Do not grant broader permissions just to make UI work.
+
+For example, actor name lookup failing did NOT mean everyone should gain:
+
+```text
+members.read
+```
+
+The correct solution was to define the narrow server-side authorization needed for actor lookup.
+
+Always solve authorization at the minimum necessary privilege.
+
+---
+
+# 75. CURRENT PRODUCT PHILOSOPHY
+
+The application should feel:
+
+```text
+professional
+financial
+calm
+compact
+clear
+responsive
+multi-business aware
+permission-aware
+```
+
+Avoid:
+
+```text
+giant cards
+giant empty forms
+excessive purple
+card inside card
+admin-panel visual noise
+unnecessary animations
+duplicated Business selectors
+raw technical errors
+raw UIDs
+```
+
+---
+
+# 76. CURRENT MOBILE FORM PHILOSOPHY
+
+Short financial actions should feel like focused actions, not entirely new pages.
+
+Prefer:
+
+```text
+centered modal
+content-driven height
+clear title
+compact fields
+primary action
+keyboard-safe scrolling
+```
+
+rather than stretching a 4-field form across the entire phone screen with large unused whitespace.
+
+---
+
+# 77. CURRENT DESKTOP PHILOSOPHY
+
+Desktop is NOT simply a giant Mobile layout.
+
+Prefer:
+
+```text
+constrained content widths
+dense rows
+compact dialogs
+side-by-side fields where appropriate
+sidebar navigation
+professional use of screen space
+```
+
+Avoid stretching cards/forms across ultra-wide monitors.
+
+---
+
+# 78. IMPORTANT THINGS NOT TO REINTRODUCE
+
+Do not accidentally bring back:
+
+```text
+automatic Business creation on login
+single-Business assumption
+Business ID = UID
+Admin team management
+members.manage for Admin
+Business switcher on every page
+Workspace wording in normal UI
+username-login callable flow
+Firebase Remote Config usage on Windows
+page-level nested Hero wrappers
+Scrollbar without shared controller
+full-screen short Mobile financial forms
+raw UID actor display
+transaction-specific duplicate actor resolvers
+```
+
+---
+
+# 79. BEFORE MAKING ANY FUTURE CHANGE
+
+A new chat/model should first answer internally:
+
+```text
+Is this Account-scoped or Business-scoped?
+
+Is it UI-only, Flutter state, Firestore, or Deno?
+
+Is there already a shared component/repository/provider for it?
+
+Could the change break multi-Business behavior?
+
+Could it weaken Owner-only team permissions?
+
+Could it break actor audit metadata?
+
+Does a backend change require Deno deployment?
+
+Is the requested behavior already implemented somewhere else?
+```
+
+Then modify only what is necessary.
+
+---
+
+# 80. WHEN SOMETHING IN THIS HANDOFF CONFLICTS WITH CODE
+
+This handoff describes the intended/current architecture as of the end of the long development session.
+
+But the repository is always the final implementation evidence.
+
+If a class/file has evolved:
+
+* inspect the current implementation
+* do not blindly paste old code
+* preserve the PRODUCT RULES described here
+* make the smallest compatible change
+
+If an old document says the app supports only one Business, treat that as stale: the current architecture supports multiple Businesses.
+
+---
+
+# 81. CURRENT NEXT-STEP PHILOSOPHY
+
+The broad architecture and UI modernization work are largely done.
+
+Future development should usually be handled as:
+
+```text
+Bug:
+“Actor line flickers while loading”
+
+UI tweak:
+“Debt cards have too much spacing”
+
+Feature:
+“Add payment-history screen”
+
+Backend task:
+“Add X trusted Business API”
+
+Release:
+“Build/sign APK”
+```
+
+Avoid reopening the entire architecture unless a real product requirement demands it.
+
+---
+
+# 82. MOST IMPORTANT PROJECT INVARIANTS — QUICK VERSION
+
+If you remember nothing else, preserve these:
+
+```text
+1. One account can belong to multiple Businesses.
+
+2. activeBusinessId is only current context.
+
+3. Do not auto-create a Business on login.
+
+4. Business switching belongs on Dashboard.
+
+5. Received Invitations are account-scoped.
+
+6. Business creator/Owner alone manages the team.
+
+7. Admin must NOT regain team-management permission.
+
+8. Financial writes preserve audit actor UID.
+
+9. Actor names resolve from trusted userProfiles data.
+
+10. Never display raw UID.
+
+11. Parent creator and payment recorder are different concepts.
+
+12. Deno is production backend for trusted HTTP operations.
+
+13. Deno changes require deployment; Hot Restart is not enough.
+
+14. Firebase Functions are not the assumed production path.
+
+15. Financial UI changes must not silently change calculations/business rules.
+
+16. Use the existing shared design system.
+
+17. Mobile short financial forms are compact centered dialogs.
+
+18. Preserve the accepted Quick Add + → × interaction.
+
+19. Do not reintroduce Windows Remote Config access.
+
+20. For AI coding prompts: narrow scope, smallest edit, minimum credits.
+```
+
+---
+
+## الرسالة دي تستخدمها إزاي؟
+
+في أي شات جديد، ابعتها أول حاجة وبعدها اكتب مثلًا:
+
+> اقرأ الـhandoff ده واعتبره الـsource of truth للمشروع. عايز دلوقتي نعدل كذا. قبل ما تقترح أي تعديل، حافظ على الـarchitecture والـproduct invariants المذكورة.
+
+والأهم: **ما تخليش أي شات جديد يبدأ يعيد تصميم الـbackend أو الـmulti-business من الصفر**. إحنا عدينا المرحلة دي بالفعل، وفي قرارات كتير هنا اتاخدت نتيجة bugs ومشاكل حقيقية ظهرت واتصلحت، مش مجرد اختيارات نظرية.
+
+وأنا أنصحك تحفظ الرسالة دي في ملف داخل المشروع نفسه مثل:
+
+```text
+docs/PROJECT_HANDOFF.md
+```
+
+لأنها مش بس مفيدة لـChatGPT؛ دي بقت تقريبًا **وثيقة Architecture + Product Decisions + Known Pitfalls** للمشروع كله.

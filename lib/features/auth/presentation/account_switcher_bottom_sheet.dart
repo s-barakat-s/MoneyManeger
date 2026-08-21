@@ -114,7 +114,7 @@ class AccountSwitcherBottomSheet extends ConsumerWidget {
                         AppButton(
                           label: 'Remove all accounts from this device',
                           icon: Icons.delete_sweep_outlined,
-                          variant: AppButtonVariant.text,
+                          variant: AppButtonVariant.tertiary,
                           onPressed: isBusy
                               ? null
                               : () => _confirmClearAll(context, ref),

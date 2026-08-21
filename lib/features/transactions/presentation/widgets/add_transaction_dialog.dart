@@ -2,12 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/models/owner.dart';
+import '../../../../core/theme/app_theme_tokens.dart';
 import '../../../../core/utils/readable_date_formatter.dart';
+import '../../../../shared/models/owner.dart';
 import '../../../../shared/models/transaction.dart' as money;
+import '../../../../shared/widgets/app_fields.dart';
 import '../../../../shared/widgets/financial_workflow_widgets.dart';
 import '../../../../shared/widgets/form_dialog_widgets.dart';
-import '../../../../shared/widgets/responsive_dialog_content.dart';
 import '../../../business/application/business_access_providers.dart';
 import '../../../business/domain/permission.dart';
 import '../../../owners/presentation/widgets/add_owner_dialog.dart';
@@ -57,7 +58,7 @@ class _AddTransactionDialogState extends ConsumerState<AddTransactionDialog> {
     final ownersAsync = ref.watch(ownersStreamProvider);
 
     return AdaptiveFinancialFormDialog(
-      title: const Text('Add transaction'),
+      title: 'Add transaction',
       canDismiss: !_isSaving,
       content: ownersAsync.when(
         data: (owners) {
@@ -224,97 +225,95 @@ class _TransactionForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveDialogContent(
-      child: Form(
-        key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: amountController,
-              autofocus: true,
-              decoration: amountInputDecoration('Amount'),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              inputFormatters: decimalAmountInputFormatters,
-              validator: (value) {
-                final amount = double.tryParse(value?.trim() ?? '');
-                if (amount == null || amount <= 0) {
-                  return 'Enter an amount greater than 0';
-                }
-
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: ValueKey(ownerId),
-              initialValue: ownerId,
-              decoration: const InputDecoration(labelText: 'Money Holder'),
-              items: [
-                for (final owner in owners)
-                  DropdownMenuItem(
-                    value: owner.id,
-                    child: Text(owner.name, overflow: TextOverflow.ellipsis),
+    return Form(
+      key: formKey,
+      child: AppFormColumn(
+        children: [
+          AppMoneyField(
+            label: 'Amount',
+            controller: amountController,
+            autofocus: true,
+            inputFormatters: decimalAmountInputFormatters,
+            validator: (value) {
+              final amount = double.tryParse(value?.trim() ?? '');
+              if (amount == null || amount <= 0) {
+                return 'Enter an amount greater than 0';
+              }
+              return null;
+            },
+          ),
+          AppSelectField<String>(
+            label: 'Money Holder',
+            value: ownerId,
+            items: [
+              for (final owner in owners)
+                DropdownMenuItem(
+                  value: owner.id,
+                  child: Text(owner.name, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: onOwnerChanged,
+            validator: (value) =>
+                value == null ? 'Select a money holder' : null,
+          ),
+          AppSelectField<money.TransactionType>(
+            label: 'Type',
+            value: type,
+            items: [
+              DropdownMenuItem(
+                value: money.TransactionType.income,
+                child: Text(
+                  'Income',
+                  style: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).extension<AppThemeTokens>()?.income,
+                    fontWeight: FontWeight.w600,
                   ),
-              ],
-              onChanged: onOwnerChanged,
-              validator: (value) =>
-                  value == null ? 'Select a money holder' : null,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<money.TransactionType>(
-              initialValue: type,
-              decoration: const InputDecoration(labelText: 'Type'),
-              items: const [
-                DropdownMenuItem(
-                  value: money.TransactionType.income,
-                  child: Text('Income'),
                 ),
-                DropdownMenuItem(
-                  value: money.TransactionType.expense,
-                  child: Text('Expense'),
+              ),
+              DropdownMenuItem(
+                value: money.TransactionType.expense,
+                child: Text(
+                  'Expense',
+                  style: TextStyle(
+                    color: Theme.of(
+                      context,
+                    ).extension<AppThemeTokens>()?.expense,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  onTypeChanged(value);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            DialogDateField(
-              label: 'Date',
-              value: _formatDate(date),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: date,
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
-                );
-
-                if (picked != null) {
-                  onDateChanged(picked);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: noteController,
-              decoration: const InputDecoration(labelText: 'Note'),
-              maxLines: 3,
-            ),
-            if (errorMessage != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-          ],
-        ),
+            onChanged: (value) {
+              if (value != null) {
+                onTypeChanged(value);
+              }
+            },
+          ),
+          AppDateField(
+            label: 'Date',
+            value: _formatDate(date),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: date,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+
+              if (picked != null) {
+                onDateChanged(picked);
+              }
+            },
+          ),
+          AppTextArea(
+            label: 'Note',
+            controller: noteController,
+            hintText: 'Optional note or reference',
+          ),
+          if (errorMessage != null) FinancialFormError(message: errorMessage!),
+        ],
       ),
     );
   }

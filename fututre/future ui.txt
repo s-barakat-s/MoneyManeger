@@ -1,0 +1,1380 @@
+تمام. بعد كل الـscreens اللي راجعناها، عندنا صورة كاملة تقريبًا، وأقدر أحط **Master UI Redesign Plan** للتطبيق كله.
+
+الاتجاه اللي أنصح به: **Professional Financial SaaS** — هادي، دقيق، نظيف، سريع في القراءة، ومش مهرجان ألوان. هنستفيد من فلسفة Material في الـadaptive/accessibility foundations، ومن Apple في وضوح الـhierarchy والـmodality، ومن Fluent في desktop density والـlayout والـmotion. ([Material Design][1])
+مش هننسخ أي Design System حرفيًا؛ هنطلع **Money Manager Design System** خاص بينا.
+
+---
+
+# الرؤية النهائية
+
+الشكل المستهدف:
+
+**80–90% Neutral UI**
+أبيض/رمادي في Light، وفحمي/أسود هادئ في Dark.
+
+**Purple = Brand & Primary Action فقط.**
+
+الألوان الأخرى لها معنى فقط:
+
+```text
+Purple   → Brand / selected / primary action
+Green    → Income / positive / success
+Red      → Expense / debt / destructive
+Blue     → Receivable / informational
+Amber    → Assets / warning
+Neutral  → كل باقي الـUI
+```
+
+يعني ممنوع كل Card يبقى له لون وخلفية وGlow مختلفين.
+
+---
+
+# UI-1 — Design Foundations
+
+دي أهم مرحلة؛ قبل تعديل أي شاشة.
+
+## Color System
+
+نبني semantic tokens بدل hex values متناثرة:
+
+```text
+background
+surface
+surfaceElevated
+surfaceSubtle
+
+textPrimary
+textSecondary
+textMuted
+
+border
+borderStrong
+
+primary
+primaryHover
+primaryPressed
+primaryContainer
+
+success
+danger
+warning
+info
+```
+
+Light وDark يستخدموا **نفس token names** بقيم مختلفة.
+
+### Purple
+
+نحتفظ بالبنفسجي الحالي كهوية، لكن نقلل استخدامه.
+
+البنفسجي يظهر في:
+
+* Primary CTA
+* Selected navigation
+* Active tabs
+* Focus ring
+* Quick Add
+* بعض الـbrand moments
+
+مش:
+
+* كل icon
+* كل badge
+* كل card
+* كل empty state
+
+---
+
+# UI-2 — Typography
+
+الحالي فيه مشكلة إن كل حاجة Bold تقريبًا، خصوصًا Desktop.
+
+نعمل Scale ثابت:
+
+```text
+Display / Financial Hero
+32–36
+
+Page Title
+28–30 desktop
+24 mobile
+
+Section Title
+20–22
+
+Card Title
+16–18
+
+Body
+14–16
+
+Metadata
+12–14
+```
+
+وفي قاعدة:
+
+**الـweight مش بديل للـhierarchy.**
+
+مش كل title يبقى 700/800.
+
+نحتاج font واحد neutral ومقروء في كل النظام، بدل display personality مبالغ فيها.
+
+---
+
+# UI-3 — Spacing & Grid
+
+نثبت spacing ramp واحدة:
+
+```text
+4
+8
+12
+16
+24
+32
+48
+64
+```
+
+Fluent نفسه يعتمد spacing/grid system موحد عشان العلاقات بين العناصر تفضل واضحة عبر الأجهزة. ([Fluent 2 Design System][2])
+
+## Mobile
+
+```text
+Page horizontal padding: 16–20
+Section gap: 24–32
+Card internal padding: 16
+```
+
+## Desktop
+
+نعمل لأول مرة **Page Container حقيقي**.
+
+مش كل حاجة تمتد من الـsidebar لآخر الشاشة.
+
+مثلًا:
+
+```text
+Standard lists:
+max-width ~ 1100–1200
+
+Forms/settings/details:
+max-width ~ 720–900
+
+Dashboard:
+may use wider responsive grid
+```
+
+وده هيحل تقريبًا نص مشاكل Desktop اللي شفناها.
+
+---
+
+# UI-4 — Surface System
+
+حاليًا كل حاجة تقريبًا Card.
+
+هنعمل hierarchy:
+
+```text
+Page
+    ↓
+Section
+    ↓
+Surface
+    ↓
+Card / Row only when required
+```
+
+يبقى عندنا 3 أنواع Cards فقط تقريبًا:
+
+### Summary Card
+
+Available Cash / Total Debts / Total Assets.
+
+### Record Card
+
+Debt / Receivable / Asset على mobile.
+
+### Interactive Settings Card
+
+مجموعة settings مرتبطة.
+
+ونوقف:
+
+> Card inside card inside another surface.
+
+---
+
+# UI-5 — Radius / Border / Shadow
+
+نقلل عدد الـradii.
+
+مثلًا:
+
+```text
+Small controls      8
+Inputs/buttons      10–12
+Cards               14–16
+Sheets/dialogs      20–24
+```
+
+مفيش 7 أشكال Rounded مختلفة.
+
+Shadow تستخدم فقط لما hierarchy محتاج elevation؛ Fluent أيضًا يعامل elevation كوسيلة لتوضيح مستوى العنصر وأهميته، مش كزينة. ([Fluent 2 Design System][3])
+
+Light mode نعتمد أكتر على border + subtle shadow.
+
+Dark mode نعتمد أكتر على surface contrast + border، وليس glow.
+
+---
+
+# UI-6 — Buttons
+
+نعمل 4 levels فقط:
+
+```text
+Primary
+Secondary
+Tertiary / Text
+Destructive
+```
+
+## Primary
+
+بنفسجي solid.
+
+## Secondary
+
+neutral surface + border.
+
+## Tertiary
+
+minimal/text.
+
+## Destructive
+
+أحمر، لكن فقط عند الحاجة.
+
+ومهم جدًا:
+
+**مش كل action full-width.**
+
+Full width منطقي في Mobile forms.
+
+مش منطقي مثلًا `Pay` بعرض 900px على Desktop.
+
+---
+
+# UI-7 — Inputs / Forms
+
+دي واحدة من أكبر المشاكل الحالية.
+
+هنعمل family موحدة:
+
+```text
+AppTextField
+MoneyField
+SelectField
+DateField
+TextArea
+FormError
+FormActionBar
+```
+
+Material نفسه يشدد على إن Text Field لازم يظهر بوضوح كعنصر interactive، مع variants متسقة بدل anatomy متغيرة عشوائيًا. ([Material Design][4])
+
+نختار **نظام واحد** للـlabels.
+
+مثلاً floating/outlined في كل الحالات، مش:
+
+مرة placeholder،
+مرة floating،
+مرة filled.
+
+### Money Field
+
+يبقى:
+
+```text
+Amount
+EGP | 1,000.00
+```
+
+مش user يكتب currency.
+
+---
+
+# UI-8 — Form Layout
+
+## Mobile
+
+القرار الحالي صحيح:
+
+**Full-screen financial forms.**
+
+الهيكل:
+
+```text
+AppBar
+↓
+Scrollable form
+↓
+Sticky action footer
+```
+
+Save primary.
+
+Cancel/back secondary.
+
+والـfooter يكون keyboard-aware.
+
+## Desktop
+
+Dialog بعرض تقريبًا:
+
+```text
+440–520px
+```
+
+مش الـ300px الضيق الحالي.
+
+Header واضح.
+
+Body scrollable.
+
+Footer ثابت:
+
+```text
+Cancel       Save
+```
+
+Apple تعتبر الـsheets/modality مناسبة للمهام المركزة قبل الرجوع للسياق الأساسي، وده هو بالضبط استخدامنا للـdesktop forms. ([Apple Developer][5])
+
+---
+
+# UI-9 — App Shell Mobile
+
+Current Business حاليًا واخد مساحة كبيرة فوق كل صفحة.
+
+نخليه Compact Business Context.
+
+مثلًا:
+
+```text
+Barakat                         ▾
+Owner
+```
+
+بدل:
+
+```text
+Account: email...
+
+[ gigantic business dropdown ]
+```
+
+الـAccount مش لازم يفضل ظاهر كـemail فوق كل financial page.
+
+نقله إلى profile/account surfaces.
+
+الـBusiness مهم أثناء العمل المالي.
+
+الـAccount أقل أهمية بصريًا.
+
+---
+
+# UI-10 — Bottom Navigation
+
+نحتفظ بالarchitecture:
+
+```text
+Home
+Transactions
+   +
+Transfers
+Reports
+```
+
+لكن نعيد تصميمها أهدى.
+
+الـbar الحالي ضخمة وغامقة والـFAB فيه glow قوي.
+
+هنخفف:
+
+* ارتفاع الـbar
+* glow
+* اختلاف حجم الأيقونات
+* weight بتاع labels
+
+مع الحفاظ على الـcenter action كشخصية التطبيق.
+
+Apple تصف tab bars كتمثيل للأقسام العليا من hierarchy، وده متوافق مع الـUX architecture اللي ثبتناه بالفعل. ([Apple Developer][6])
+
+---
+
+# الـQuick Add — Signature Interaction
+
+دي هنرجعها أحسن من الأول.
+
+### Closed
+
+```text
++
+```
+
+### Tap
+
+الـ`+` تعمل rotation حوالي 45° وتتحول بصريًا إلى:
+
+```text
+×
+```
+
+وفي نفس الوقت الـBottom Sheet تطلع.
+
+### Close
+
+Reverse animation.
+
+مش Bounce مبالغ فيه.
+
+حركة قصيرة حوالي 180–240ms.
+
+Fluent توصي إن motion يوجه الانتباه حسب أهمية العنصر بدل استخدام animation كزخرفة. ([Fluent 2 Design System][7])
+
+## Mobile
+
+نحتفظ بالـQuick Add Bottom Sheet الحالي لأنه أساسه ممتاز.
+
+مع polish.
+
+## Desktop
+
+نتخلص من nested submenu:
+
+```text
+Money >
+Record >
+Setup >
+```
+
+ونعمل Popover واحد:
+
+```text
+Quick Add
+
+MONEY
+↗ Income
+↘ Expense
+↔ Transfer
+
+RECORD
+Debt
+Receivable
+
+SETUP
+Money Holder
+```
+
+---
+
+# UI-11 — Desktop Sidebar
+
+الـsidebar الحالية محتاجة hierarchy.
+
+مش كل شيء بنفس المستوى.
+
+تصور:
+
+```text
+Money Manager
+
+[ Current Business ▾ ]
+
++ Quick Add
+
+OVERVIEW
+Dashboard
+Reports
+
+MONEY
+Transactions
+Transfers
+
+FINANCE
+Money Holders
+Debts
+Receivables
+Assets
+
+BUSINESS
+Members
+Activity
+Received Invitations
+
+──────────
+
+Settings
+```
+
+**Owners → Money Holders.**
+
+دي مهمة جدًا لأن `Owners` دلوقتي بقت مربكة مع Business Owner.
+
+Selected item أهدى من المستطيل البنفسجي الفاتح الكبير الحالي.
+
+---
+
+# UI-12 — Page Header
+
+دي مشكلة Global.
+
+حاليًا Desktop يعمل:
+
+```text
+Debts
+↓
+Debts
+```
+
+هنعمل **Page Title واحد** فقط.
+
+مثال:
+
+```text
+Debts                              + Add debt
+Track and manage what your Business owes.
+```
+
+وبعدها content.
+
+Secondary screen:
+
+```text
+← Transaction details
+```
+
+مش عنوانين.
+
+---
+
+# UI-13 — Dashboard
+
+Dashboard محتاجة أكبر redesign screen-level.
+
+التصور النهائي:
+
+```text
+Barakat ▾
+
+Good morning, Saif            Settings
+
+AVAILABLE CASH
+EGP xxx
+
+Business Worth
+EGP xxx
+
+Financial Snapshot
+┌ Debts ─────── Receivables ┐
+└ Assets ───── Money Holders┘
+
+Recent Transactions
+
+Financial Health
+```
+
+لكن بدون giant purple rectangle ياخد نصف الشاشة.
+
+Purple hero نحافظ عليه كـbrand moment، لكن:
+
+* أصغر
+* cleaner
+* أقل gradient noise
+* معلومات أقل جواه
+
+## Desktop Dashboard
+
+Grid فعلي، مش Mobile stretched.
+
+مثلًا:
+
+```text
+Available Cash      Business Worth
+
+Debts    Receivables    Assets    Money Holders
+
+Recent Transactions       Financial Health
+```
+
+---
+
+# UI-14 — Transactions
+
+## Mobile
+
+Compact card:
+
+```text
+↘ Expense                -EGP 10.00
+   saif
+   Today · Created by sofa
+```
+
+Overflow آخر الكارت.
+
+## Desktop
+
+Row style:
+
+```text
+TYPE      HOLDER     DATE       CREATED BY       AMOUNT       ...
+Expense   saif       Today      sofa             -EGP 10
+```
+
+مش Card بعرض الصفحة فيه 80% مساحة فاضية.
+
+---
+
+# UI-15 — Transaction Details
+
+نعمل financial details template.
+
+```text
+EXPENSE
+
+-EGP 10.00
+
+Details
+Money Holder         saif
+Date                 Today
+Note                 —
+
+Audit trail
+Created by sofa
+Today · 2:42 AM
+```
+
+Audit أخف بصريًا من financial value.
+
+---
+
+# UI-16 — Debts / Receivables
+
+دول يبقوا mirror design.
+
+### Debt
+
+Red semantic accent.
+
+### Receivable
+
+Green/blue positive accent.
+
+Record:
+
+```text
+Saif                   Active
+
+EGP 1,000
+remaining
+
+Paid EGP 200 of EGP 1,200
+────────────── 17%
+
+Due Sep 21
+
+Pay
+```
+
+نوقف التكرار الحالي بين:
+
+Remaining
+Total
+Paid
+Paid X of Y
+
+الـprogress نفسه يوصل المعلومة.
+
+Desktop يتحول compact rows/cards محدودة العرض.
+
+---
+
+# UI-17 — Assets
+
+Assets الحالية قريبة من المطلوب.
+
+هنشيل redundancy:
+
+```text
+Equipment
+...
+Category: Equipment
+```
+
+واحدة تكفي.
+
+Record:
+
+```text
+Laptop                   Equipment
+EGP 25,000
+Purchased Aug 19
+```
+
+---
+
+# UI-18 — Money Holders
+
+أولًا:
+
+**Owners / Money Holders → Money Holders**
+
+والـsidebar:
+
+**Owners → Money Holders**
+
+Record:
+
+```text
+S   Saif                          ...
+    Cash
+
+    Balance
+    -EGP 10.00
+```
+
+لازم الرقم يبقى له label عشان مايبقاش غامض.
+
+---
+
+# UI-19 — Transfers
+
+Empty state الحالي functional لكن generic.
+
+نخليه compact ومتوازن.
+
+لو فيه زر Add في الـheader، مش ضروري نكرر نفس CTA بصورة ضخمة إلا لو empty state ده onboarding لأول Transfer.
+
+ممكن نعمل:
+
+```text
+No transfers yet
+
+Transfers move money between your Money Holders.
+
+Transfer money
+```
+
+على Mobile.
+
+Desktop content يبقى constrained.
+
+---
+
+# UI-20 — Activity
+
+من **Cards → Timeline/List**.
+
+دي من أهم تغييرات الـUI.
+
+مثال:
+
+```text
+Today
+
+●  sofa
+│  Created a receivable
+│  3:20 AM
+│
+●  sofa
+│  Created an asset
+│  3:18 AM
+```
+
+Desktop:
+
+أكتر density.
+
+مش 130px card لكل event.
+
+ونغير:
+
+```text
+Created a business asset
+```
+
+إلى:
+
+```text
+Created an asset
+```
+
+---
+
+# UI-21 — Members
+
+نظبط role/status hierarchy.
+
+مثلًا:
+
+```text
+S   sofa                         OWNER
+    email@gmail.com
+    Active
+```
+
+ما يبقاش:
+
+`Owner` جنب الاسم + `Owner` badge مرة ثانية.
+
+Former/Suspended sections distinct لكن quieter.
+
+**Invite member** أفضل من `Add`.
+
+---
+
+# UI-22 — Settings
+
+Settings تبقى أقرب لتجربة Apple Settings من ناحية hierarchy/list behavior، مش giant cards لكل حاجة؛ Apple نفسها تستخدم lists/tables كوسيلة أساسية لتنظيم settings والhierarchy. ([Apple Developer][8])
+
+Mobile:
+
+```text
+Account
+[ Profile ]
+[ Received Invitations ]
+[ Password ]
+[ Switch Account ]
+[ Log out ]
+
+Business
+[ Current Business ]
+[ Members ]
+[ Activity ]
+
+App
+[ Appearance ]
+```
+
+لكن card nesting أقل بكتير.
+
+Desktop:
+
+`max-width ~ 760–850`
+
+مش بعرض الشاشة.
+
+---
+
+# UI-23 — Received Invitations
+
+دي Account-scoped.
+
+عشان كده في الصفحة دي **ما نديش Current Business visual prominence كبير**.
+
+Empty state constrained.
+
+لو مفيش invitation:
+
+```text
+No invitations
+
+Business invitations sent to
+1s.barakat... will appear here.
+```
+
+---
+
+# UI-24 — Reports
+
+حاليًا placeholder.
+
+ما نخترعش charts.
+
+لكن presentation أرقى.
+
+```text
+Reports
+
+Financial reports are coming soon.
+
+Until then, explore and filter your transactions.
+
+View transactions
+```
+
+Illustration بسيطة أو chart abstract pattern لو حبينا، بدون fake data.
+
+---
+
+# UI-25 — Auth
+
+الـAuth حاليًا من أحسن أجزاء التطبيق.
+
+ما نعملش إعادة اختراع.
+
+بس نربطها بنفس:
+
+* input system
+* buttons
+* typography
+* radius
+* surfaces
+* motion
+
+بحيث ماتحسش إن Login معمول من App مختلف.
+
+---
+
+# UI-26 — Empty / Error / Loading
+
+نعمل 3 shared states حقيقيين:
+
+```text
+AppEmptyState
+AppErrorState
+AppSkeleton
+```
+
+مش كل صفحة تخترع icon وحجم وفراغ مختلف.
+
+## Empty
+
+Compact by default.
+
+Large illustration فقط في onboarding-level states.
+
+## Error
+
+Title + short explanation + Retry.
+
+## Loading
+
+Skeletons.
+
+Blank spinner full page فقط في initialization الضروري.
+
+---
+
+# UI-27 — Dark Mode
+
+Dark mode مش:
+
+> نحول الأبيض لأسود.
+
+نعمل neutral hierarchy حقيقية:
+
+```text
+background
+surface
+surfaceRaised
+surfaceInteractive
+border
+```
+
+نتجنب purple glow everywhere.
+
+الـDark الحالي عنده potential كويس لكن surfaces قريبة جدًا من بعض أحيانًا.
+
+---
+
+# UI-28 — Responsive Strategy
+
+دي لازم تبقى **Adaptive**، مش responsive scaling فقط.
+
+Apple نفسها تؤكد إن layout لازم يتكيف مع تغيير الحجم والسياق مع الحفاظ على هوية التجربة. ([Apple Developer][9]) Material 3 أيضًا يتضمن foundations للـlarge-screen/adaptive experiences. ([Material Design][10])
+
+### Mobile
+
+Cards / bottom navigation / full-screen forms.
+
+### Tablet
+
+2-column grids عند الحاجة.
+
+### Desktop
+
+Sidebar / constrained content / rows / desktop dialogs.
+
+**ممنوع Mobile card يتمدد إلى 1200px.**
+
+---
+
+# UI-29 — Accessibility
+
+قبل release:
+
+* interactive targets ~44–48+
+* keyboard focus واضح Desktop
+* Tab order منطقي
+* Escape dismiss
+* semantic labels
+* contrast
+* text scaling
+* status مش color-only
+* reduced-motion support
+
+Material foundations تشمل accessibility ضمن الأسس، وFluent/Apple كذلك يعاملوا hierarchy/adaptation كجزء من تجربة متعددة المنصات. ([Material Design][11])
+
+---
+
+# UI-30 — Motion
+
+قاعدة:
+
+**Motion explains state change.**
+
+مش للزينة.
+
+الحركات المهمة:
+
+```text
+Quick Add + → ×
+Bottom sheet entry/exit
+Desktop popover
+Business switch subtle content transition
+Tabs indicator
+Dialog/sheet
+List insertion/removal
+Success confirmation
+```
+
+مفيش elements بتطير وتbounce في كل الشاشة.
+
+---
+
+# الترتيب التنفيذي
+
+أنا **ما أنصحش Codex يعدل كل التطبيق دفعة واحدة**.
+
+نعمل:
+
+```text
+UI-1
+Design Tokens + Theme Foundations
+
+UI-2
+Shared Components
+Buttons / Inputs / Cards / Page containers / States
+
+UI-3
+App Shell
+Mobile Nav / Sidebar / Business context / Quick Add
+
+UI-4
+Dashboard
+
+UI-5
+Financial Lists
+Transactions / Debts / Receivables / Assets / Money Holders / Transfers
+
+UI-6
+Financial Forms + Details
+
+UI-7
+Members / Activity / Invitations / Settings
+
+UI-8
+Auth / Onboarding / Account Switching
+
+UI-9
+Dark Mode + Responsive + Motion
+
+UI-10
+Visual QA + Accessibility + Release Polish
+```
+
+والقاعدة الذهبية أثناء كل ده:
+
+> **ممنوع UI redesign يلمس Business Logic.**
+
+Deno، Firestore، repositories، permissions، actor audit، Business switching، routing architecture، mutation guards — **كلهم ثابتين**.
+
+إحنا هنغير **presentation layer + shared visual primitives فقط** إلا لو ظهر bug حقيقي.
+
+---
+
+## الـLook النهائي اللي مستهدفه
+
+مش:
+
+**Gaming purple finance app.**
+
+ومش:
+
+**Material demo app.**
+
+ومش:
+
+**ألوان أخضر/أحمر/أزرق/برتقالي في كل زاوية.**
+
+الهدف:
+
+**Serious modern financial product**
+Neutral + restrained purple identity + excellent density + sharp hierarchy + excellent responsive behavior.
+
+يخليك على الموبايل تحس إنه consumer finance app محترم، وعلى Windows تحس إنه financial desktop product فعلي، **بنفس الهوية في الاتنين**.
+
+والخطوة الصح من هنا: نبدأ **UI-1 Design Tokens + Foundation** الأول، ولا نلمس Dashboard أو أي شاشة قبل ما الـtokens والـshared primitives يتحددوا.
+
+[1]: https://m3.material.io/?utm_source=chatgpt.com "Material Design 3 - Google's latest open source design system"
+[2]: https://fluent2.microsoft.design/layout?utm_source=chatgpt.com "Layout - Fluent 2 Design System"
+[3]: https://fluent2.microsoft.design/elevation?utm_source=chatgpt.com "Elevation - Fluent 2 Design System"
+[4]: https://m3.material.io/components/text-fields?utm_source=chatgpt.com "Text fields – Material Design 3"
+[5]: https://developer.apple.com/design/human-interface-guidelines/modality?utm_source=chatgpt.com "Modality | Apple Developer Documentation"
+[6]: https://developer.apple.com/design/human-interface-guidelines/tab-bars?utm_source=chatgpt.com "Tab bars | Apple Developer Documentation"
+[7]: https://fluent2.microsoft.design/motion?utm_source=chatgpt.com "Motion - Fluent 2 Design System"
+[8]: https://developer.apple.com/design/human-interface-guidelines/lists-and-tables?utm_source=chatgpt.com "Lists and tables | Apple Developer Documentation"
+[9]: https://developer.apple.com/design/human-interface-guidelines/layout?utm_source=chatgpt.com "Layout | Apple Developer Documentation"
+[10]: https://m3.material.io/get-started?utm_source=chatgpt.com "Get started with Modern UI design - Material Design 3"
+[11]: https://m3.material.io/foundations?utm_source=chatgpt.com "Foundations - Material Design 3 - Learn the basics of ..."
+
+
+
+أكيد. أنا شايف أفضل تقسيم يبقى **10 Phases واضحة**، وكل Phase تبني على اللي قبلها من غير ما نخبط الدنيا أو نغيّر business logic.
+
+## UI-1 — Design Foundations
+
+نثبت الأساس كله:
+
+* Color tokens
+* Light/Dark semantic colors
+* Typography scale
+* Spacing scale
+* Radius system
+* Borders
+* Elevation/shadows
+* Icon sizing
+* Responsive breakpoints
+* Max content widths
+
+**الهدف:** يبقى عندنا Single Source of Truth للشكل.
+
+---
+
+## UI-2 — Shared Components
+
+نبني الـvisual primitives المشتركة:
+
+* Buttons
+* Inputs
+* MoneyField
+* SelectField
+* DateField
+* TextArea
+* Search bar
+* Tabs
+* Status chips
+* Cards
+* Dialogs
+* Bottom sheets
+* Empty/Error/Loading states
+* Form action bars
+* Page containers
+
+**الهدف:** أي شاشة جديدة تستخدم نفس اللغة البصرية.
+
+---
+
+## UI-3 — App Shell & Navigation
+
+نظبط الهيكل العام:
+
+* Mobile Bottom Nav
+* Desktop Sidebar
+* Current Business context
+* Page headers
+* Secondary screen headers
+* Quick Add mobile
+* Quick Add desktop
+* ترجع حركة `+ → ×`
+* Responsive navigation
+
+وكمان:
+
+* `Owners` → `Money Holders`
+* Desktop sidebar grouping
+
+**الهدف:** أول ما التطبيق يفتح تحس إنه Product واحد محترف.
+
+---
+
+## UI-4 — Dashboard
+
+إعادة تصميم الـHome بالكامل:
+
+* Available Cash
+* Business Worth
+* Financial Snapshot
+* Recent Transactions
+* Financial Health
+* Mobile layout
+* Desktop grid
+* إزالة الـgiant purple card feeling
+* hierarchy أقوى وأهدى
+
+**الهدف:** Dashboard تبقى أقوى شاشة في التطبيق.
+
+---
+
+## UI-5 — Financial Lists
+
+نظبط عائلة الشاشات المالية مع بعض:
+
+* Transactions
+* Transfers
+* Debts
+* Receivables
+* Assets
+* Money Holders
+
+نعمل:
+
+* responsive record patterns
+* Desktop compact rows/cards
+* Mobile cards
+* Search/filter bars
+* Summary cards
+* Active/Archived tabs
+* semantic colors
+* empty states
+
+**الهدف:** ميبقاش الـDesktop مجرد Mobile stretched.
+
+---
+
+## UI-6 — Financial Forms & Details
+
+كل create/edit/detail flows:
+
+* Add Income/Expense
+* Transfer
+* Add Debt
+* Add Receivable
+* Payment/Collection
+* Add Asset
+* Money Holder
+* Transaction Details
+
+ونثبت:
+
+* Desktop modal system
+* Mobile full-screen form system
+* Sticky footer
+* field anatomy
+* currency prefix
+* validation states
+* Audit presentation
+
+**الهدف:** الفورمز كلها تحس إنها معمولة من نفس النظام.
+
+---
+
+## UI-7 — Business & Administration
+
+نعيد تصميم:
+
+* Business Members
+* Invite Member
+* Pending Invitations
+* Received Invitations
+* Activity
+* Business switcher
+* Settings
+
+بالذات:
+
+* Activity تتحول من giant cards إلى timeline/feed
+* Members hierarchy تتظبط
+* Role vs Status يبقوا واضحين
+* Settings يقل فيها card nesting
+
+**الهدف:** الجزء الإداري يبقى Professional SaaS فعلًا.
+
+---
+
+## UI-8 — Auth & Onboarding
+
+نربط:
+
+* Login
+* Register
+* Email Verification
+* Username/Profile completion
+* Choose Account
+* Switch Account
+* Workspace/Business onboarding
+
+بنفس Design System الجديد.
+
+من غير ما نهدم شكل Auth الحالي لأنه أصلًا من أحسن أجزاء التطبيق.
+
+**الهدف:** ميبقاش Auth شكله App والـcore app شكله App تاني.
+
+---
+
+## UI-9 — Dark Mode, Responsive & Motion
+
+مرحلة polish تقيلة:
+
+* Dark mode refinement
+* Tablet layouts
+* Desktop density
+* Small-screen fixes
+* Mixed Arabic/English content
+* Keyboard/focus
+* `+ → ×`
+* sheet transitions
+* popovers
+* tabs
+* business switching motion
+* reduced-motion support
+
+**الهدف:** نفس الهوية تشتغل صح على Mobile + Windows + Web.
+
+---
+
+## UI-10 — Final Visual QA & Release Polish
+
+آخر sweep قبل النشر:
+
+* Visual consistency
+* Spacing audit
+* Typography audit
+* Contrast
+* Accessibility
+* Touch targets
+* Text scaling
+* Overflow
+* Dialog sizes
+* Empty/loading/error states
+* Icon consistency
+* Dark/Light parity
+* Desktop/Mobile parity
+
+وبنعمل walkthrough كامل:
+`Login → Business → Transaction → Debt → Invite → Activity → Settings → Switch Business → Switch Account`
+
+---
+
+فالترتيب النهائي يبقى:
+
+```text
+UI-1  Design Foundations
+UI-2  Shared Components
+UI-3  App Shell & Navigation
+UI-4  Dashboard
+UI-5  Financial Lists
+UI-6  Financial Forms & Details
+UI-7  Business / Admin / Settings
+UI-8  Auth & Onboarding
+UI-9  Dark Mode / Responsive / Motion
+UI-10 Final QA & Release Polish
+```
+
+وأهم قاعدة في الـ10 Phases كلها:
+
+**Presentation only.**
+ممنوع Codex يلمس Deno، Firestore، permissions، repositories، audit، routing semantics، أو business logic إلا لو ظهر bug حقيقي مستقل.

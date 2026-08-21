@@ -153,7 +153,7 @@ class _MemberList extends StatelessWidget {
       children: [
         if (active.isNotEmpty)
           _MemberGroup(
-            title: 'Active team',
+            title: 'Active',
             members: active,
             canManage: canManage,
             roles: roles,
@@ -231,7 +231,7 @@ class _MemberCard extends ConsumerWidget {
     final mutationBusy = ref.watch(memberMutationControllerProvider).isLoading;
     final canAct = canManage && !member.isProtectedOwner && !mutationBusy;
     return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
           CircleAvatar(

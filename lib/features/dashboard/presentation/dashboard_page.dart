@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/finance/balance_providers.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_layout.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -21,7 +22,9 @@ import '../../../shared/widgets/loading_skeleton.dart';
 import '../../../shared/widgets/home_summary_hero.dart';
 import '../../company_assets/application/company_asset_providers.dart';
 import '../../business/application/business_access_providers.dart';
+import '../../business/application/business_providers.dart';
 import '../../business/domain/permission.dart';
+import '../../business/presentation/workspace_switcher_card.dart';
 import '../../debts/presentation/debt_stream_providers.dart';
 import '../../owners/presentation/owner_stream_providers.dart';
 
@@ -78,6 +81,8 @@ class DashboardPage extends ConsumerWidget {
       title: 'Dashboard',
       currentLocation: currentLocation,
       showMobileAppBarTitle: false,
+      mobileContentPadding: 0,
+      mobileAppBar: const _DashboardMobileAppBar(),
       child: ownersAsync.when(
         data: (owners) => _DashboardHome(
           owners: owners,
@@ -134,87 +139,275 @@ class _DashboardHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       clipBehavior: Clip.none,
-      padding: AppBottomNavSpacer.listPadding(context),
+      padding: _dashboardPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _DashboardHeader(),
-          const SizedBox(height: AppSpacing.lg),
-          if (readable.length == 6) ...[
-            _MainFinancialCards(
-              owners: owners,
-              cashAsync: cashAsync,
-              debtsAsync: debtsAsync,
-              receivablesAsync: receivablesAsync,
-              assetsAsync: assetsAsync,
-              ownerBalancesAsync: ownerBalancesAsync,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-          ],
-          _FinancialSnapshotGrid(
+          _FinancialPosition(
             owners: owners,
+            cashAsync: cashAsync,
             debtsAsync: debtsAsync,
             receivablesAsync: receivablesAsync,
             assetsAsync: assetsAsync,
+            ownerBalancesAsync: ownerBalancesAsync,
             readable: readable,
+            recentTransactions:
+                readable.contains(Permission.transactionsRead) &&
+                    readable.contains(Permission.ownersRead)
+                ? _RecentActivitySection(
+                    owners: owners,
+                    transactionsAsync: transactionsAsync,
+                  )
+                : null,
           ),
-          if (readable.contains(Permission.transactionsRead) &&
-              readable.contains(Permission.ownersRead)) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _RecentActivitySection(
-              owners: owners,
-              transactionsAsync: transactionsAsync,
-            ),
-          ],
-          if (readable.containsAll({
-            Permission.ownersRead,
-            Permission.transactionsRead,
-            Permission.transfersRead,
-            Permission.debtsRead,
-            Permission.receivablesRead,
-          })) ...[
-            const SizedBox(height: AppSpacing.lg),
-            _FinancialHealthCard(
-              cashAsync: cashAsync,
-              debtsAsync: debtsAsync,
-              receivablesAsync: receivablesAsync,
-            ),
-          ],
         ],
       ),
     );
   }
+
+  EdgeInsets _dashboardPadding(BuildContext context) {
+    final bottomPadding = AppBottomNavSpacer.listPadding(context).bottom;
+    final width = MediaQuery.sizeOf(context).width;
+    final horizontal = width >= AppBreakpoints.compact
+        ? AppSpacing.xl
+        : AppSpacing.lg;
+    return EdgeInsets.fromLTRB(
+      horizontal,
+      AppSpacing.md,
+      horizontal,
+      bottomPadding,
+    );
+  }
 }
 
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader();
+class _FinancialPosition extends StatelessWidget {
+  const _FinancialPosition({
+    required this.owners,
+    required this.cashAsync,
+    required this.debtsAsync,
+    required this.receivablesAsync,
+    required this.assetsAsync,
+    required this.ownerBalancesAsync,
+    required this.readable,
+    this.recentTransactions,
+  });
+
+  final List<Owner> owners;
+  final AsyncValue<double> cashAsync;
+  final AsyncValue<DebtSummary> debtsAsync;
+  final AsyncValue<DebtSummary> receivablesAsync;
+  final AsyncValue<double> assetsAsync;
+  final AsyncValue<Map<String, double>> ownerBalancesAsync;
+  final Set<Permission> readable;
+  final Widget? recentTransactions;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= AppBreakpoints.expanded;
+
+        final hero = readable.length == 6
+            ? _MainFinancialCards(
+                owners: owners,
+                cashAsync: cashAsync,
+                debtsAsync: debtsAsync,
+                receivablesAsync: receivablesAsync,
+                assetsAsync: assetsAsync,
+                ownerBalancesAsync: ownerBalancesAsync,
+              )
+            : null;
+        final snapshot = _FinancialSnapshotGrid(
+          owners: owners,
+          debtsAsync: debtsAsync,
+          receivablesAsync: receivablesAsync,
+          assetsAsync: assetsAsync,
+          readable: readable,
+        );
+
+        if (isDesktop && hero != null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Money Manager',
-                style: Theme.of(context).textTheme.headlineLarge,
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: _DashboardSection(
+                    title: 'Financial Position',
+                    child: hero,
+                  ),
+                ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Your business financial overview',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              const SizedBox(height: AppSpacing.xxl),
+              snapshot,
+              if (recentTransactions != null) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                recentTransactions!,
+              ],
             ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (hero != null) ...[hero, const SizedBox(height: AppSpacing.lg)],
+            snapshot,
+            if (recentTransactions != null) ...[
+              const SizedBox(height: AppSpacing.xl),
+              recentTransactions!,
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DashboardMobileAppBar extends ConsumerWidget
+    implements PreferredSizeWidget {
+  const _DashboardMobileAppBar();
+
+  static const double _toolbarHeight = 60;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(_toolbarHeight);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resolution = ref.watch(workspaceResolutionProvider);
+    final mutation = ref.watch(workspaceMutationControllerProvider);
+
+    final businessName =
+        resolution.value?.selectedWorkspace?.businessName ?? 'Current Business';
+
+    final canSwitch = resolution.value?.selectedWorkspace != null;
+    final busy = mutation.isLoading;
+    final colors = Theme.of(context).colorScheme;
+
+    return AppBar(
+      automaticallyImplyLeading: false,
+      primary: true,
+      toolbarHeight: _toolbarHeight,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      surfaceTintColor: Colors.transparent,
+      titleSpacing: AppSpacing.lg,
+
+      title: Row(
+        children: [
+          // Wallet logo — contained for visual weight.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.10),
+              borderRadius: AppRadius.borderMd,
+            ),
+            child: SizedBox.square(
+              dimension: 38,
+              child: Icon(
+                Icons.account_balance_wallet_rounded,
+                size: 22,
+                color: colors.primary,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        _RoundIconButton(
-          icon: Icons.settings_outlined,
-          tooltip: 'Settings',
-          onTap: () => context.push(AppRoute.settings.path),
+
+          const SizedBox(width: AppSpacing.md),
+
+          Text(
+            'Money Manager',
+            maxLines: 1,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              color: colors.onSurface,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          const SizedBox(width: AppSpacing.md),
+
+          Flexible(
+            child: Semantics(
+              button: canSwitch,
+              enabled: canSwitch && !busy,
+              label: canSwitch
+                  ? 'Current Business: $businessName. Double tap to switch Business.'
+                  : 'Current Business loading',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: canSwitch && !busy
+                      ? () => showBusinessSwitcherSheet(context)
+                      : null,
+                  borderRadius: AppRadius.borderPill,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer.withValues(alpha: 0.72),
+                      borderRadius: AppRadius.borderPill,
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              businessName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    fontSize: 14,
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+
+                          const SizedBox(width: AppSpacing.xs),
+
+                          if (busy)
+                            const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Icon(
+                              Icons.expand_more_rounded,
+                              size: 18,
+                              color: colors.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: AppSpacing.sm),
+          child: IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            iconSize: 24,
+            tooltip: 'Settings',
+            onPressed: () => context.push(AppRoute.settings.path),
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(AppControlHeight.standard),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.borderMd,
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -301,7 +494,7 @@ class _BalanceHeroCard extends StatelessWidget {
           borderRadius: AppRadius.borderXxl,
           onTap: () => _showFinancialBreakdown(context),
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -325,7 +518,7 @@ class _BalanceHeroCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   _moneyValue(cashAsync),
                   maxLines: 2,
@@ -336,7 +529,7 @@ class _BalanceHeroCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,
@@ -830,16 +1023,31 @@ class _FinancialSnapshotGrid extends StatelessWidget {
         ),
     ];
 
+    if (shortcuts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return _DashboardSection(
       title: 'Financial Snapshot',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final columns = shortcuts.length == 1
-              ? 1
-              : constraints.maxWidth >= 920
-              ? 4
-              : 2;
+          final isDesktop = constraints.maxWidth >= AppBreakpoints.expanded;
 
+          if (isDesktop) {
+            return Row(
+              children: [
+                for (var i = 0; i < shortcuts.length; i++) ...[
+                  Expanded(
+                    child: _MetricCard(data: shortcuts[i], isDesktop: true),
+                  ),
+                  if (i < shortcuts.length - 1)
+                    const SizedBox(width: AppSpacing.md),
+                ],
+              ],
+            );
+          }
+
+          final columns = shortcuts.length == 1 ? 1 : 2;
           return GridView.builder(
             itemCount: shortcuts.length,
             shrinkWrap: true,
@@ -848,10 +1056,10 @@ class _FinancialSnapshotGrid extends StatelessWidget {
               crossAxisCount: columns,
               crossAxisSpacing: AppSpacing.md,
               mainAxisSpacing: AppSpacing.md,
-              childAspectRatio: constraints.maxWidth < 360 ? 1 : 1.15,
+              mainAxisExtent: 142,
             ),
             itemBuilder: (context, index) =>
-                _MetricCard(data: shortcuts[index]),
+                _MetricCard(data: shortcuts[index], isDesktop: false),
           );
         },
       ),
@@ -860,9 +1068,10 @@ class _FinancialSnapshotGrid extends StatelessWidget {
 }
 
 class _MetricCard extends StatelessWidget {
-  const _MetricCard({required this.data});
+  const _MetricCard({required this.data, this.isDesktop = false});
 
   final _MetricData data;
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
@@ -886,7 +1095,7 @@ class _MetricCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: isDesktop ? AppSpacing.sm : AppSpacing.md),
             Text(
               data.title,
               maxLines: 1,
@@ -897,7 +1106,7 @@ class _MetricCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               data.value,
               maxLines: 1,
@@ -986,15 +1195,22 @@ class _RecentActivitySection extends StatelessWidget {
             );
           }
 
-          return Column(
-            children: [
-              for (final transaction in latest)
-                _TransactionActivityTile(
-                  transaction: transaction,
-                  ownerName:
-                      ownerNames[transaction.ownerId] ?? transaction.ownerId,
-                ),
-            ],
+          return AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (var index = 0; index < latest.length; index++) ...[
+                  _TransactionActivityTile(
+                    transaction: latest[index],
+                    ownerName:
+                        ownerNames[latest[index].ownerId] ??
+                        latest[index].ownerId,
+                  ),
+                  if (index < latest.length - 1)
+                    const Divider(height: 1, indent: 56),
+                ],
+              ],
+            ),
           );
         },
         loading: () => const LoadingSkeleton(itemCount: 3),
@@ -1023,163 +1239,54 @@ class _TransactionActivityTile extends StatelessWidget {
     final amount = isIncome ? transaction.amount : -transaction.amount;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: AppCard(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        backgroundColor: color.withValues(alpha: 0.06),
-        borderColor: color.withValues(alpha: 0.12),
-        child: Row(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Icon(
+                isIncome
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                color: color,
+                size: 20,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Icon(
-                  isIncome
-                      ? Icons.trending_up_rounded
-                      : Icons.trending_down_rounded,
-                  color: color,
-                  size: 20,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isIncome ? 'Income' : 'Expense',
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
-              ),
+                Text(
+                  '$ownerName · ${_formatDate(transaction.date)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isIncome ? 'Income' : 'Expense',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  Text(
-                    '$ownerName - ${_formatDate(transaction.date)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            AmountText(
-              amount: amount,
-              variant: isIncome
-                  ? AmountTextVariant.income
-                  : AmountTextVariant.expense,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          AmountText(
+            amount: amount,
+            variant: isIncome
+                ? AmountTextVariant.income
+                : AmountTextVariant.expense,
+          ),
+        ],
       ),
     );
   }
-}
-
-class _FinancialHealthCard extends StatelessWidget {
-  const _FinancialHealthCard({
-    required this.cashAsync,
-    required this.debtsAsync,
-    required this.receivablesAsync,
-  });
-
-  final AsyncValue<double> cashAsync;
-  final AsyncValue<DebtSummary> debtsAsync;
-  final AsyncValue<DebtSummary> receivablesAsync;
-
-  @override
-  Widget build(BuildContext context) {
-    final cash = cashAsync.value ?? 0;
-    final debts = debtsAsync.value?.remaining ?? 0;
-    final receivables = receivablesAsync.value?.remaining ?? 0;
-    final health = _healthFor(
-      cash: cash,
-      debts: debts,
-      receivables: receivables,
-    );
-
-    return _DashboardSection(
-      title: 'Financial Health',
-      child: AppCard(
-        backgroundColor: health.color.withValues(alpha: 0.1),
-        borderColor: health.color.withValues(alpha: 0.24),
-        child: Row(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: health.color.withValues(alpha: 0.14),
-                borderRadius: AppRadius.borderLg,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Icon(health.icon, color: health.color, size: 24),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    health.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(health.message),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  _HealthState _healthFor({
-    required double cash,
-    required double debts,
-    required double receivables,
-  }) {
-    if (debts > cash) {
-      return const _HealthState(
-        title: 'Critical',
-        message: 'Outstanding debts exceed available cash.',
-        icon: Icons.error_rounded,
-        color: AppColors.danger,
-      );
-    }
-    if (debts > cash * 0.75 || receivables > cash) {
-      return const _HealthState(
-        title: 'Warning',
-        message: 'Some financial items need attention.',
-        icon: Icons.warning_amber_rounded,
-        color: AppColors.warning,
-      );
-    }
-
-    return const _HealthState(
-      title: 'Healthy',
-      message: 'Everything looks good.',
-      icon: Icons.check_circle_rounded,
-      color: AppColors.success,
-    );
-  }
-}
-
-class _HealthState {
-  const _HealthState({
-    required this.title,
-    required this.message,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String message;
-  final IconData icon;
-  final Color color;
 }
 
 class _DashboardSection extends StatelessWidget {
@@ -1197,42 +1304,6 @@ class _DashboardSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         child,
       ],
-    );
-  }
-}
-
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: AppRadius.borderLg,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.borderLg,
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: AppRadius.borderLg,
-            ),
-            child: Icon(icon, color: AppColors.primary),
-          ),
-        ),
-      ),
     );
   }
 }

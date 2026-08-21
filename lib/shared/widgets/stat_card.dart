@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import 'app_card.dart';
@@ -25,7 +25,7 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = accentColor ?? AppColors.primary;
+    final color = accentColor ?? Theme.of(context).colorScheme.primary;
 
     return AppCard(
       onTap: onTap,
@@ -40,7 +40,7 @@ class StatCard extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
-                child: Icon(icon, color: color, size: 22),
+                child: Icon(icon, color: color, size: AppIconSize.standard),
               ),
             ),
             const SizedBox(height: AppSpacing.md),

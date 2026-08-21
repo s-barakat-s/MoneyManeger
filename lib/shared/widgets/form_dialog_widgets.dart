@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_radius.dart';
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_layout.dart';
+import 'app_fields.dart';
+import 'app_overlays.dart';
 
 class DialogFormActions extends StatelessWidget {
   const DialogFormActions({
@@ -19,28 +20,15 @@ class DialogFormActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilledButton(
-            onPressed: onPrimaryPressed,
-            child: isSaving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(primaryLabel),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          OutlinedButton(
-            onPressed: onCancelPressed,
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.compact;
+    return AppFormActionBar(
+      primaryLabel: primaryLabel,
+      onPrimaryPressed: onPrimaryPressed,
+      onSecondaryPressed: onCancelPressed,
+      isSubmitting: isSaving,
+      forceHorizontal: isDesktop,
+      showSecondary: isDesktop,
     );
   }
 }
@@ -51,6 +39,9 @@ class DialogDateField extends StatelessWidget {
     required this.value,
     required this.onTap,
     this.trailing,
+    this.helperText,
+    this.errorText,
+    this.enabled = true,
     super.key,
   });
 
@@ -58,27 +49,20 @@ class DialogDateField extends StatelessWidget {
   final String value;
   final VoidCallback onTap;
   final Widget? trailing;
+  final String? helperText;
+  final String? errorText;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: AppRadius.borderXl,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.borderXl,
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: label,
-            suffixIcon: trailing ?? const Icon(Icons.calendar_today_outlined),
-          ),
-          child: Text(value, style: Theme.of(context).textTheme.bodyLarge),
-        ),
-      ),
+    return AppDateField(
+      label: label,
+      value: value,
+      onTap: onTap,
+      trailing: trailing,
+      helperText: helperText,
+      errorText: errorText,
+      enabled: enabled,
     );
   }
-}
-
-InputDecoration amountInputDecoration(String label) {
-  return InputDecoration(labelText: label, prefixText: 'EGP ');
 }

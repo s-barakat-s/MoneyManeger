@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_spacing.dart';
 
 class AppBottomNavSpacer extends StatelessWidget {
@@ -8,7 +9,7 @@ class AppBottomNavSpacer extends StatelessWidget {
   static const double navigationBarHeight = 76;
   static const double navigationBarBottomMargin = AppSpacing.sm;
   static const double breathingRoom = AppSpacing.lg;
-  static const double desktopBreakpoint = 900;
+  static const double desktopBreakpoint = AppBreakpoints.expanded;
 
   static double bottomPadding(BuildContext context) {
     if (MediaQuery.sizeOf(context).width >= desktopBreakpoint) {

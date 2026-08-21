@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_spacing.dart';
 
 class PageHeader extends StatelessWidget {
@@ -7,6 +8,7 @@ class PageHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
+    this.actions = const [],
     this.actionLabel,
     this.compactActionLabel,
     this.actionIcon = Icons.add_rounded,
@@ -17,6 +19,7 @@ class PageHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? action;
+  final List<Widget> actions;
   final String? actionLabel;
   final String? compactActionLabel;
   final IconData actionIcon;
@@ -24,13 +27,23 @@ class PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shellScope = AppPageHeaderScope.maybeOf(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final resolvedAction = action ?? _buildAction(constraints);
+        final generatedAction = _buildAction(constraints);
+        final resolvedActions = <Widget>[
+          ...actions,
+          ?action,
+          if (actions.isEmpty && action == null) ?generatedAction,
+        ];
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (shellScope?.onBack != null) ...[
+              BackButton(onPressed: shellScope!.onBack),
+              const SizedBox(width: AppSpacing.sm),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,9 +68,17 @@ class PageHeader extends StatelessWidget {
                 ],
               ),
             ),
-            if (resolvedAction != null) ...[
+            if (resolvedActions.isNotEmpty) ...[
               const SizedBox(width: AppSpacing.md),
-              resolvedAction,
+              Flexible(
+                flex: 0,
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  alignment: WrapAlignment.end,
+                  children: resolvedActions,
+                ),
+              ),
             ],
           ],
         );
@@ -70,7 +91,7 @@ class PageHeader extends StatelessWidget {
       return null;
     }
 
-    final isCompact = constraints.maxWidth < 420;
+    final isCompact = constraints.maxWidth < AppBreakpoints.compact;
     final label = isCompact ? compactActionLabel ?? 'Add' : actionLabel!;
 
     return FilledButton.icon(
@@ -78,5 +99,24 @@ class PageHeader extends StatelessWidget {
       icon: Icon(actionIcon),
       label: Text(label),
     );
+  }
+}
+
+class AppPageHeaderScope extends InheritedWidget {
+  const AppPageHeaderScope({
+    required this.onBack,
+    required super.child,
+    super.key,
+  });
+
+  final VoidCallback? onBack;
+
+  static AppPageHeaderScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<AppPageHeaderScope>();
+  }
+
+  @override
+  bool updateShouldNotify(AppPageHeaderScope oldWidget) {
+    return onBack != oldWidget.onBack;
   }
 }
